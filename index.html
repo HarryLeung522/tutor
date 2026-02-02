@@ -3,165 +3,474 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>派克導師提示器 - 穩定版</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <title>派克Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; }
-        body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; padding: 20px; }
-        .container { max-width: 850px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: var(--primary); }
-        .controls { background: #ebf5fb; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
-        input[type="date"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
-        .btn-main { background: var(--accent); color: white; border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-left: 10px; }
-        .status { text-align: center; margin: 15px 0; font-weight: bold; color: #e67e22; }
-        .tutor-card { border: 1px solid #ddd; margin-bottom: 20px; border-radius: 8px; background: #fff; }
-        .tutor-header { background: var(--primary); color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
-        .tutor-content { padding: 15px; white-space: pre-wrap; background: #f9f9f9; font-size: 15px; line-height: 1.6; border-top: 1px solid #eee; }
-        .copy-btn { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 1.5rem; }
+        .loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; justify-content: center; align-items: center; z-index: 50; }
     </style>
 </head>
-<body>
+<body class="p-6">
 
-<div class="container">
-    <h1>派克導師提示器</h1>
-    <div class="controls">
-        <label>選擇開始日期：</label>
-        <input type="date" id="targetDate">
-        <button class="btn-main" onclick="startGeneration()">生成提示語</button>
+    <div id="loading" class="loading">
+        <div class="text-xl font-bold text-blue-600"><i class="fas fa-spinner fa-spin"></i> 載入資料中...</div>
     </div>
-    <div id="status" class="status"></div>
-    <div id="output"></div>
-</div>
 
-<script>
-    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv';
-
-    window.onload = () => {
-        document.getElementById('targetDate').valueAsDate = new Date();
-    };
-
-    // 專門解析 "2026年2月2日" 格式的函數
-    function parseChineseDate(dateStr) {
-        if (!dateStr) return null;
-        try {
-            // 提取數字部分 [2026, 2, 2]
-            const matches = dateStr.match(/\d+/g);
-            if (matches && matches.length >= 3) {
-                const year = parseInt(matches[0]);
-                const month = parseInt(matches[1]) - 1; // JS 月份從 0 開始
-                const day = parseInt(matches[2]);
-                return new Date(year, month, day);
-            }
-            // 如果提取失敗，試試原生解析
-            const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? null : d;
-        } catch(e) {
-            return null;
-        }
-    }
-
-    async function startGeneration() {
-        const status = document.getElementById('status');
-        const output = document.getElementById('output');
-        const selectedDateStr = document.getElementById('targetDate').value;
-
-        output.innerHTML = '';
-        status.innerText = '讀取資料中...';
-
-        Papa.parse(SHEET_URL, {
-            download: true,
-            header: false,
-            skipEmptyLines: true,
-            complete: (results) => {
-                processData(results.data, selectedDateStr);
-            },
-            error: (err) => {
-                status.innerText = '讀取失敗。原因可能是瀏覽器 CORS 限制，請嘗試用 Firefox 開啟或上傳至伺服器。';
-                console.error(err);
-            }
-        });
-    }
-
-    function processData(rows, startStr) {
-        const status = document.getElementById('status');
-        const output = document.getElementById('output');
-
-        const baseDate = new Date(startStr);
-        baseDate.setHours(0,0,0,0);
+    <div class="max-w-7xl mx-auto space-y-6">
         
-        const endDate = new Date(baseDate);
-        endDate.setDate(endDate.getDate() + 7);
-        endDate.setHours(23,59,59,999);
+        <div class="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4 md:mb-0">派克Dashboard</h1>
+            <div class="flex items-center space-x-2">
+                <label class="font-medium text-gray-600">基準日期：</label>
+                <input type="date" id="datePicker" class="border rounded-lg p-2 bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+        </div>
 
-        const tutorGroups = {};
-        let count = 0;
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div class="card flex flex-col h-full">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-xl font-bold text-gray-700"><i class="fas fa-trophy text-yellow-500 mr-2"></i>導師課堂排行榜</h2>
+                    <select id="leaderboardRange" class="border rounded px-2 py-1 text-sm bg-gray-50">
+                        <option value="7">一星期內</option>
+                        <option value="14">兩星期內</option>
+                        <option value="30">一個月內</option>
+                        <option value="180">半年內</option>
+                        <option value="schoolYear">全年內 (9月始)</option>
+                    </select>
+                </div>
+                <div class="overflow-y-auto max-h-96 flex-grow">
+                    <table class="w-full text-left">
+                        <thead class="text-gray-500 border-b">
+                            <tr>
+                                <th class="pb-2">排名</th>
+                                <th class="pb-2">導師</th>
+                                <th class="pb-2 text-right">課堂數</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
 
-        rows.forEach((row, idx) => {
-            if (idx === 0 || row.length < 7) return;
+            <div class="card flex flex-col h-full">
+                <h2 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2"><i class="fas fa-chart-pie text-blue-500 mr-2"></i>總課堂資料</h2>
+                
+                <div class="grid grid-cols-3 gap-2 mb-6 text-center">
+                    <div class="bg-blue-50 p-2 rounded-lg">
+                        <div class="text-xs text-gray-500">總課堂</div>
+                        <div id="totalLessons" class="text-xl font-bold text-blue-600">0</div>
+                    </div>
+                    <div class="bg-green-50 p-2 rounded-lg">
+                        <div class="text-xs text-gray-500">已上</div>
+                        <div id="completedLessons" class="text-xl font-bold text-green-600">0</div>
+                    </div>
+                    <div class="bg-gray-100 p-2 rounded-lg">
+                        <div class="text-xs text-gray-500">未上</div>
+                        <div id="remainingLessons" class="text-xl font-bold text-gray-600">0</div>
+                    </div>
+                </div>
 
-            // D行(索引3) 是日期，G行(索引6) 是導師
-            const dateObj = parseChineseDate(row[3]);
-            const tutorName = row[6] ? row[6].trim() : "";
+                <div class="relative flex-grow flex justify-center items-center" style="min-height: 250px;">
+                    <canvas id="generalChart"></canvas>
+                </div>
+            </div>
+        </div>
 
-            if (dateObj && tutorName) {
-                if (dateObj >= baseDate && dateObj <= endDate) {
-                    if (!tutorGroups[tutorName]) tutorGroups[tutorName] = [];
-                    tutorGroups[tutorName].push({
-                        school: row[0],
-                        course: row[1],
-                        lesson: row[2],
-                        date: row[3],
-                        day: row[4],
-                        time: row[5],
-                        ts: dateObj.getTime()
-                    });
-                    count++;
+        <div class="card">
+            <div class="flex justify-between mb-1">
+                <span class="text-base font-medium text-blue-700">總體進度 (已上 / 總課堂)</span>
+                <span id="progressText" class="text-sm font-medium text-blue-700">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-4">
+                <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-2">
+                <h2 class="text-xl font-bold text-gray-700"><i class="fas fa-user text-purple-500 mr-2"></i>導師個人數值表</h2>
+                <select id="tutorSelect" class="mt-2 md:mt-0 border rounded px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- 請選擇導師 --</option>
+                    </select>
+            </div>
+
+            <div id="tutorStatsContainer" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="flex flex-col justify-center space-y-4">
+                        <div class="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
+                            <span class="text-gray-600">該導師總課堂</span>
+                            <span id="tutorTotal" class="text-2xl font-bold text-purple-600">0</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-green-50 p-4 rounded-lg">
+                            <span class="text-gray-600">已上課堂</span>
+                            <span id="tutorCompleted" class="text-2xl font-bold text-green-600">0</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-gray-100 p-4 rounded-lg">
+                            <span class="text-gray-600">未上課堂</span>
+                            <span id="tutorRemaining" class="text-2xl font-bold text-gray-600">0</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-center" style="max-height: 300px;">
+                        <canvas id="tutorChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tutorEmptyState" class="text-center text-gray-400 py-10">
+                請從上方選單選擇一位導師以查看詳細資料
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 1. Configuration & Global Variables ---
+        const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv";
+        let rawData = [];
+        let generalChartInstance = null;
+        let tutorChartInstance = null;
+
+        // --- 2. Helper Functions ---
+
+        // Parse Date string (Assuming formats like YYYY/MM/DD, DD/MM/YYYY, or Google's default)
+        // We will try to make it robust.
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) return d;
+            
+            // Fallback for DD/MM/YYYY common in HK/TW if default fails
+            const parts = dateStr.split(/[/-]/);
+            if (parts.length === 3) {
+                // Assume DD/MM/YYYY if first part is small, or YYYY/MM/DD if first part is big
+                if (parts[0].length === 4) {
+                    return new Date(parts[0], parts[1] - 1, parts[2]);
+                } else {
+                    return new Date(parts[2], parts[1] - 1, parts[0]);
                 }
             }
-        });
-
-        if (count === 0) {
-            status.innerText = '❌ 找不到 7 天內的課程。請檢查日期是否選對，或 Sheet 內是否有該日期。';
-            return;
+            return null;
         }
 
-        status.innerText = `✅ 已成功找到 ${count} 堂課程！`;
+        function isSameDay(d1, d2) {
+            return d1.getFullYear() === d2.getFullYear() &&
+                   d1.getMonth() === d2.getMonth() &&
+                   d1.getDate() === d2.getDate();
+        }
 
-        Object.keys(tutorGroups).sort().forEach(tutor => {
-            const sortedLessons = tutorGroups[tutor].sort((a,b) => a.ts - b.ts);
-            let msgDetails = "";
-            sortedLessons.forEach(l => {
-                msgDetails += `“${l.date}”, “${l.day}”, ${l.school}、 ${l.course}、${l.lesson}, 上課時間 ${l.time}\n`;
+        // Set date picker to today by default
+        function setToday() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            document.getElementById('datePicker').value = `${year}-${month}-${day}`;
+        }
+
+        // --- 3. Data Processing ---
+
+        function processData() {
+            const selectedDateStr = document.getElementById('datePicker').value;
+            const referenceDate = new Date(selectedDateStr); // Midnight
+            
+            // Clear current views
+            updateLeaderboard(referenceDate);
+            updateGeneralStats(referenceDate);
+            updateTutorList(); // Only needs to run once essentially, but safe to re-run
+            updateTutorStats(referenceDate); // Refresh tutor view if one is selected
+        }
+
+        // --- 4. Leaderboard Logic ---
+        function updateLeaderboard(refDate) {
+            const rangeVal = document.getElementById('leaderboardRange').value;
+            let startDate = new Date(refDate);
+            let endDate = null;
+
+            if (rangeVal === 'schoolYear') {
+                // Fixed: From Sept 2025 onwards
+                startDate = new Date(2025, 8, 1); // Month is 0-indexed. 8 is Sept.
+                endDate = new Date(2099, 11, 31); // Far future
+            } else {
+                const days = parseInt(rangeVal);
+                endDate = new Date(refDate);
+                endDate.setDate(refDate.getDate() + days);
+            }
+
+            // Count lessons per tutor within range
+            const tutorCounts = {};
+
+            rawData.forEach(row => {
+                const lessonDate = parseDate(row['日期']); // Column D
+                const tutorStr = row['導師']; // Column G
+
+                if (lessonDate && tutorStr) {
+                    // Check date range
+                    // Logic: StartDate <= LessonDate <= EndDate (approximately)
+                    // For "Next X days", we usually mean from RefDate onwards.
+                    
+                    let isInRange = false;
+                    if (rangeVal === 'schoolYear') {
+                         if (lessonDate >= startDate) isInRange = true;
+                    } else {
+                        // For 1 week, 2 weeks etc. starting from today (RefDate)
+                        if (lessonDate >= startDate && lessonDate <= endDate) isInRange = true;
+                    }
+
+                    if (isInRange) {
+                        // Handle Split Tutors (Harry/Zoe)
+                        const tutors = tutorStr.split('/').map(t => t.trim());
+                        tutors.forEach(t => {
+                            if (!t) return;
+                            tutorCounts[t] = (tutorCounts[t] || 0) + 1;
+                        });
+                    }
+                }
             });
 
-            const finalMsg = `你好，${tutor}，以下為本星期需要教授的課程：\n${msgDetails}如有問題，請隨時告知，謝謝！`;
+            // Convert to array and sort
+            const sortedTutors = Object.entries(tutorCounts)
+                .sort((a, b) => b[1] - a[1]);
 
-            const card = document.createElement('div');
-            card.className = 'tutor-card';
-            card.innerHTML = `
-                <div class="tutor-header">
-                    <span>導師：${tutor}</span>
-                    <button class="copy-btn" onclick="copyText(this, \`${finalMsg.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">複製文字</button>
-                </div>
-                <div class="tutor-content">${finalMsg}</div>
-            `;
-            output.appendChild(card);
-        });
-    }
+            // Render
+            const tbody = document.getElementById('leaderboardBody');
+            tbody.innerHTML = '';
+            
+            if (sortedTutors.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">此時段無課堂</td></tr>';
+                return;
+            }
 
-    function copyText(btn, text) {
-        const el = document.createElement('textarea');
-        el.value = text;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
+            sortedTutors.forEach((item, index) => {
+                const rank = index + 1;
+                let rankClass = "text-gray-600 font-bold";
+                let icon = "";
+                if (rank === 1) { rankClass = "text-yellow-500 font-bold text-lg"; icon = "👑 "; }
+                if (rank === 2) { rankClass = "text-gray-400 font-bold text-lg"; }
+                if (rank === 3) { rankClass = "text-orange-400 font-bold text-lg"; }
+
+                const row = `
+                    <tr class="border-b last:border-0 hover:bg-gray-50">
+                        <td class="py-2 ${rankClass}">${icon}#${rank}</td>
+                        <td class="py-2 font-medium">${item[0]}</td>
+                        <td class="py-2 text-right">${item[1]}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        // --- 5. General Stats Logic ---
+        function updateGeneralStats(refDate) {
+            let total = 0;
+            let completed = 0;
+            let remaining = 0;
+            const courseTypes = {};
+
+            rawData.forEach(row => {
+                const lessonDate = parseDate(row['日期']);
+                const courseName = row['課程']; // Column B
+
+                if (lessonDate && courseName) {
+                    total++;
+                    
+                    // Logic: Completed if Date < RefDate. 
+                    // Note: If Date == RefDate (Today), is it completed? 
+                    // Usually Dashboard "Today" implies "Scheduled for today". 
+                    // Let's assume < Today is completed, >= Today is remaining/upcoming.
+                    
+                    // Reset time parts for pure date comparison
+                    const dDate = new Date(lessonDate.getFullYear(), lessonDate.getMonth(), lessonDate.getDate());
+                    const rDate = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
+
+                    if (dDate < rDate) {
+                        completed++;
+                    } else {
+                        remaining++;
+                    }
+
+                    // Course Type Count
+                    courseTypes[courseName] = (courseTypes[courseName] || 0) + 1;
+                }
+            });
+
+            // DOM Updates
+            document.getElementById('totalLessons').innerText = total;
+            document.getElementById('completedLessons').innerText = completed;
+            document.getElementById('remainingLessons').innerText = remaining;
+
+            // Progress Bar
+            const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressText').innerText = `${percent}%`;
+
+            // Chart
+            renderChart('generalChart', courseTypes, generalChartInstance, (newInstance) => { generalChartInstance = newInstance; });
+        }
+
+        // --- 6. Individual Tutor Logic ---
         
-        const oldTxt = btn.innerText;
-        btn.innerText = '✅ 已複製';
-        setTimeout(() => btn.innerText = oldTxt, 2000);
-    }
-</script>
+        // 6.1 Populate Dropdown
+        function updateTutorList() {
+            const select = document.getElementById('tutorSelect');
+            // Check if already populated to avoid resetting selection on date change if not needed
+            // But we might want to refresh if CSV changes (not implemented here).
+            // We'll simplisticly check if it has > 1 options.
+            if (select.options.length > 1) return;
 
+            const uniqueTutors = new Set();
+            rawData.forEach(row => {
+                const tStr = row['導師'];
+                if (tStr) {
+                    tStr.split('/').forEach(t => uniqueTutors.add(t.trim()));
+                }
+            });
+
+            const sorted = Array.from(uniqueTutors).sort();
+            sorted.forEach(t => {
+                if(!t) return;
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.innerText = t;
+                select.appendChild(opt);
+            });
+        }
+
+        // 6.2 Show Stats
+        function updateTutorStats(refDate) {
+            const tutorName = document.getElementById('tutorSelect').value;
+            const container = document.getElementById('tutorStatsContainer');
+            const emptyState = document.getElementById('tutorEmptyState');
+
+            if (!tutorName) {
+                container.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+
+            let total = 0;
+            let completed = 0;
+            let remaining = 0;
+            const courseTypes = {};
+
+            rawData.forEach(row => {
+                const lessonDate = parseDate(row['日期']);
+                const tStr = row['導師'];
+                const courseName = row['課程'];
+
+                if (lessonDate && tStr && tStr.includes(tutorName)) {
+                    // Strict check or partial? "Harry" in "Harry/Zoe" is true.
+                    // But "Harry" in "Harry Potter" is also true. 
+                    // We split to be precise.
+                    const tutors = tStr.split('/').map(t => t.trim());
+                    if (tutors.includes(tutorName)) {
+                        total++;
+
+                        const dDate = new Date(lessonDate.getFullYear(), lessonDate.getMonth(), lessonDate.getDate());
+                        const rDate = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
+
+                        if (dDate < rDate) {
+                            completed++;
+                        } else {
+                            remaining++;
+                        }
+
+                        courseTypes[courseName] = (courseTypes[courseName] || 0) + 1;
+                    }
+                }
+            });
+
+            document.getElementById('tutorTotal').innerText = total;
+            document.getElementById('tutorCompleted').innerText = completed;
+            document.getElementById('tutorRemaining').innerText = remaining;
+
+            renderChart('tutorChart', courseTypes, tutorChartInstance, (newInstance) => { tutorChartInstance = newInstance; });
+        }
+
+        // --- 7. Chart Rendering Helper ---
+        function renderChart(canvasId, dataObj, currentInstance, setInstanceCallback) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            if (currentInstance) {
+                currentInstance.destroy();
+            }
+
+            const labels = Object.keys(dataObj);
+            const dataValues = Object.values(dataObj);
+            
+            // Generate nice colors
+            const bgColors = [
+                '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+                '#EC4899', '#6366F1', '#14B8A6', '#F97316', '#64748B'
+            ];
+
+            const newChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: bgColors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 12, font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+
+            setInstanceCallback(newChart);
+        }
+
+        // --- 8. Initialization ---
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setToday();
+
+            Papa.parse(SHEET_CSV_URL, {
+                download: true,
+                header: true, // Uses first row as keys (學校, 課程...)
+                complete: function(results) {
+                    rawData = results.data;
+                    document.getElementById('loading').style.display = 'none';
+                    processData();
+                },
+                error: function(err) {
+                    alert("無法讀取資料，請檢查網絡或 Google Sheet 權限。");
+                    console.error(err);
+                    document.getElementById('loading').style.display = 'none';
+                }
+            });
+
+            // Listeners
+            document.getElementById('datePicker').addEventListener('change', processData);
+            document.getElementById('leaderboardRange').addEventListener('change', () => {
+                const selectedDateStr = document.getElementById('datePicker').value;
+                updateLeaderboard(new Date(selectedDateStr));
+            });
+            document.getElementById('tutorSelect').addEventListener('change', () => {
+                const selectedDateStr = document.getElementById('datePicker').value;
+                updateTutorStats(new Date(selectedDateStr));
+            });
+        });
+
+    </script>
 </body>
 </html>
