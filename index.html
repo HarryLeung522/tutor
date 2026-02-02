@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>派克導師提示器</title>
+    <title>派克導師提示器 - 穩定版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .controls { background: #ebf5fb; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
-        input[type="date"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; margin: 0 10px; }
-        .btn { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .tutor-card { border: 1px solid #ddd; margin-bottom: 20px; border-radius: 8px; overflow: hidden; }
-        .tutor-header { background: var(--primary); color: white; padding: 10px 15px; display: flex; justify-content: space-between; }
-        .tutor-content { padding: 15px; white-space: pre-wrap; background: #f9f9f9; font-size: 15px; line-height: 1.6; }
-        .copy-btn { background: var(--success); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
-        .debug-info { font-size: 12px; color: #999; margin-top: 10px; }
+        .container { max-width: 850px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: var(--primary); }
+        .controls { background: #ebf5fb; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
+        input[type="date"] { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
+        .btn-main { background: var(--accent); color: white; border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin-left: 10px; }
+        .status { text-align: center; margin: 15px 0; font-weight: bold; color: #e67e22; }
+        .tutor-card { border: 1px solid #ddd; margin-bottom: 20px; border-radius: 8px; background: #fff; }
+        .tutor-header { background: var(--primary); color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .tutor-content { padding: 15px; white-space: pre-wrap; background: #f9f9f9; font-size: 15px; line-height: 1.6; border-top: 1px solid #eee; }
+        .copy-btn { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -26,85 +27,84 @@
     <div class="controls">
         <label>選擇開始日期：</label>
         <input type="date" id="targetDate">
-        <button class="btn" onclick="fetchData()">生成提示字句</button>
+        <button class="btn-main" onclick="startGeneration()">生成提示語</button>
     </div>
-    <div id="status" style="text-align:center; font-weight:bold; color: #e67e22;"></div>
+    <div id="status" class="status"></div>
     <div id="output"></div>
 </div>
 
 <script>
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv';
+    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv';
 
     window.onload = () => {
         document.getElementById('targetDate').valueAsDate = new Date();
     };
 
-    // 強化的日期解析器
-    function parseDate(dateStr) {
+    // 專門解析 "2026年2月2日" 格式的函數
+    function parseChineseDate(dateStr) {
         if (!dateStr) return null;
-        // 嘗試處理多種格式: YYYY/MM/DD, DD/MM/YYYY, YYYY-MM-DD
-        const parts = dateStr.split(/[-/.]/);
-        let date;
-        
-        if (parts[0].length === 4) { // YYYY/MM/DD
-            date = new Date(parts[0], parts[1] - 1, parts[2]);
-        } else if (parts[2]?.length === 4) { // DD/MM/YYYY
-            date = new Date(parts[2], parts[1] - 1, parts[0]);
-        } else {
-            date = new Date(dateStr);
-        }
-        return isNaN(date.getTime()) ? null : date;
-    }
-
-    async function fetchData() {
-        const output = document.getElementById('output');
-        const status = document.getElementById('status');
-        const selectedDateStr = document.getElementById('targetDate').value;
-        
-        output.innerHTML = '';
-        status.innerText = '正在讀取 Google Sheet 資料...';
-
         try {
-            const response = await fetch(CSV_URL);
-            const csvText = await response.text();
-            
-            Papa.parse(csvText, {
-                header: false,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    processRows(results.data, selectedDateStr);
-                }
-            });
-        } catch (err) {
-            status.innerText = '讀取失敗，請確認網路連線。';
+            // 提取數字部分 [2026, 2, 2]
+            const matches = dateStr.match(/\d+/g);
+            if (matches && matches.length >= 3) {
+                const year = parseInt(matches[0]);
+                const month = parseInt(matches[1]) - 1; // JS 月份從 0 開始
+                const day = parseInt(matches[2]);
+                return new Date(year, month, day);
+            }
+            // 如果提取失敗，試試原生解析
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
+        } catch(e) {
+            return null;
         }
     }
 
-    function processRows(rows, startStr) {
-        const output = document.getElementById('output');
+    async function startGeneration() {
         const status = document.getElementById('status');
-        
+        const output = document.getElementById('output');
+        const selectedDateStr = document.getElementById('targetDate').value;
+
+        output.innerHTML = '';
+        status.innerText = '讀取資料中...';
+
+        Papa.parse(SHEET_URL, {
+            download: true,
+            header: false,
+            skipEmptyLines: true,
+            complete: (results) => {
+                processData(results.data, selectedDateStr);
+            },
+            error: (err) => {
+                status.innerText = '讀取失敗。原因可能是瀏覽器 CORS 限制，請嘗試用 Firefox 開啟或上傳至伺服器。';
+                console.error(err);
+            }
+        });
+    }
+
+    function processData(rows, startStr) {
+        const status = document.getElementById('status');
+        const output = document.getElementById('output');
+
         const baseDate = new Date(startStr);
-        baseDate.setHours(0, 0, 0, 0);
+        baseDate.setHours(0,0,0,0);
         
         const endDate = new Date(baseDate);
         endDate.setDate(endDate.getDate() + 7);
-        endDate.setHours(23, 59, 59, 999);
+        endDate.setHours(23,59,59,999);
 
         const tutorGroups = {};
-        let matchCount = 0;
+        let count = 0;
 
-        rows.forEach((row, index) => {
-            // 跳過標題列或無效列
-            if (index === 0 || row.length < 7) return;
+        rows.forEach((row, idx) => {
+            if (idx === 0 || row.length < 7) return;
 
-            const dateStr = row[3]; // D行
-            const tutorName = row[6]?.trim(); // G行
-            const rowDate = parseDate(dateStr);
+            // D行(索引3) 是日期，G行(索引6) 是導師
+            const dateObj = parseChineseDate(row[3]);
+            const tutorName = row[6] ? row[6].trim() : "";
 
-            if (rowDate && tutorName) {
-                // 檢查是否在 7 日內
-                if (rowDate >= baseDate && rowDate <= endDate) {
+            if (dateObj && tutorName) {
+                if (dateObj >= baseDate && dateObj <= endDate) {
                     if (!tutorGroups[tutorName]) tutorGroups[tutorName] = [];
                     tutorGroups[tutorName].push({
                         school: row[0],
@@ -113,49 +113,55 @@
                         date: row[3],
                         day: row[4],
                         time: row[5],
-                        ts: rowDate.getTime()
+                        ts: dateObj.getTime()
                     });
-                    matchCount++;
+                    count++;
                 }
             }
         });
 
-        if (matchCount === 0) {
-            status.innerText = '❌ 找不到任何課程。請檢查：1.日期是否正確 2.Google Sheet 是否包含該日期。';
+        if (count === 0) {
+            status.innerText = '❌ 找不到 7 天內的課程。請檢查日期是否選對，或 Sheet 內是否有該日期。';
             return;
         }
 
-        status.innerText = `✅ 找到 ${matchCount} 堂課程，共計 ${Object.keys(tutorGroups).length} 位導師。`;
+        status.innerText = `✅ 已成功找到 ${count} 堂課程！`;
 
         Object.keys(tutorGroups).sort().forEach(tutor => {
-            const lessons = tutorGroups[tutor].sort((a, b) => a.ts - b.ts);
-            let lessonLines = "";
-            lessons.forEach(l => {
-                lessonLines += `“${l.date}”, “${l.day}”, ${l.school}、 ${l.course}、${l.lesson}, 上課時間 ${l.time}\n`;
+            const sortedLessons = tutorGroups[tutor].sort((a,b) => a.ts - b.ts);
+            let msgDetails = "";
+            sortedLessons.forEach(l => {
+                msgDetails += `“${l.date}”, “${l.day}”, ${l.school}、 ${l.course}、${l.lesson}, 上課時間 ${l.time}\n`;
             });
 
-            const text = `你好，${tutor}，以下為本星期需要教授的課程：\n${lessonLines}如有問題，請隨時告知，謝謝！`;
+            const finalMsg = `你好，${tutor}，以下為本星期需要教授的課程：\n${msgDetails}如有問題，請隨時告知，謝謝！`;
 
             const card = document.createElement('div');
             card.className = 'tutor-card';
             card.innerHTML = `
                 <div class="tutor-header">
-                    <span>${tutor}</span>
-                    <button class="copy-btn" onclick="copyToClipboard(this, \`${text.replace(/`/g, '\\`')}\`)">複製提示語</button>
+                    <span>導師：${tutor}</span>
+                    <button class="copy-btn" onclick="copyText(this, \`${finalMsg.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">複製文字</button>
                 </div>
-                <div class="tutor-content">${text}</div>
+                <div class="tutor-content">${finalMsg}</div>
             `;
             output.appendChild(card);
         });
     }
 
-    function copyToClipboard(btn, text) {
-        navigator.clipboard.writeText(text).then(() => {
-            const old = btn.innerText;
-            btn.innerText = '已複製！';
-            setTimeout(() => btn.innerText = old, 2000);
-        });
+    function copyText(btn, text) {
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        
+        const oldTxt = btn.innerText;
+        btn.innerText = '✅ 已複製';
+        setTimeout(() => btn.innerText = oldTxt, 2000);
     }
 </script>
+
 </body>
 </html>
