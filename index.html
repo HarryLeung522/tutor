@@ -53,8 +53,7 @@
                                 <th class="pb-2 text-right">課堂數</th>
                             </tr>
                         </thead>
-                        <tbody id="leaderboardBody">
-                            </tbody>
+                        <tbody id="leaderboardBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -98,7 +97,7 @@
                 <h2 class="text-xl font-bold text-gray-700"><i class="fas fa-user text-purple-500 mr-2"></i>導師個人數值表</h2>
                 <select id="tutorSelect" class="mt-2 md:mt-0 border rounded px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-purple-500">
                     <option value="">-- 請選擇導師 --</option>
-                    </select>
+                </select>
             </div>
 
             <div id="tutorStatsContainer" class="hidden">
@@ -117,56 +116,43 @@
                             <span id="tutorRemaining" class="text-2xl font-bold text-gray-600">0</span>
                         </div>
                     </div>
-                    
                     <div class="flex justify-center" style="max-height: 300px;">
                         <canvas id="tutorChart"></canvas>
                     </div>
                 </div>
             </div>
-            
-            <div id="tutorEmptyState" class="text-center text-gray-400 py-10">
-                請從上方選單選擇一位導師以查看詳細資料
-            </div>
+            <div id="tutorEmptyState" class="text-center text-gray-400 py-10">請從上方選單選擇導師</div>
         </div>
-
     </div>
 
     <script>
-        // --- 1. Configuration & Global Variables ---
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv";
         let rawData = [];
         let generalChartInstance = null;
         let tutorChartInstance = null;
 
-        // --- 2. Helper Functions ---
-
-        // Parse Date string (Assuming formats like YYYY/MM/DD, DD/MM/YYYY, or Google's default)
-        // We will try to make it robust.
+        /**
+         * 修正後的日期解析函數
+         * 專門處理 "2026年2月2日" 這種格式
+         */
         function parseDate(dateStr) {
             if (!dateStr) return null;
-            const d = new Date(dateStr);
-            if (!isNaN(d.getTime())) return d;
             
-            // Fallback for DD/MM/YYYY common in HK/TW if default fails
-            const parts = dateStr.split(/[/-]/);
-            if (parts.length === 3) {
-                // Assume DD/MM/YYYY if first part is small, or YYYY/MM/DD if first part is big
-                if (parts[0].length === 4) {
-                    return new Date(parts[0], parts[1] - 1, parts[2]);
-                } else {
-                    return new Date(parts[2], parts[1] - 1, parts[0]);
-                }
+            // 處理「2026年2月2日」格式
+            // 使用正規表達式提取數字
+            const match = dateStr.match(/(\d+)年(\d+)月(\d+)日/);
+            if (match) {
+                const year = parseInt(match[1]);
+                const month = parseInt(match[2]) - 1; // JS 月份由 0 開始
+                const day = parseInt(match[3]);
+                return new Date(year, month, day);
             }
-            return null;
+
+            // 如果是其他標準格式 (如 2026-02-02)
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
         }
 
-        function isSameDay(d1, d2) {
-            return d1.getFullYear() === d2.getFullYear() &&
-                   d1.getMonth() === d2.getMonth() &&
-                   d1.getDate() === d2.getDate();
-        }
-
-        // Set date picker to today by default
         function setToday() {
             const now = new Date();
             const year = now.getFullYear();
@@ -175,302 +161,159 @@
             document.getElementById('datePicker').value = `${year}-${month}-${day}`;
         }
 
-        // --- 3. Data Processing ---
-
         function processData() {
             const selectedDateStr = document.getElementById('datePicker').value;
-            const referenceDate = new Date(selectedDateStr); // Midnight
-            
-            // Clear current views
-            updateLeaderboard(referenceDate);
-            updateGeneralStats(referenceDate);
-            updateTutorList(); // Only needs to run once essentially, but safe to re-run
-            updateTutorStats(referenceDate); // Refresh tutor view if one is selected
+            const refDate = new Date(selectedDateStr);
+            refDate.setHours(0,0,0,0); // 歸零時間部分方便比較
+
+            updateLeaderboard(refDate);
+            updateGeneralStats(refDate);
+            updateTutorList();
+            updateTutorStats(refDate);
         }
 
-        // --- 4. Leaderboard Logic ---
         function updateLeaderboard(refDate) {
             const rangeVal = document.getElementById('leaderboardRange').value;
             let startDate = new Date(refDate);
-            let endDate = null;
+            let endDate = new Date(refDate);
 
             if (rangeVal === 'schoolYear') {
-                // Fixed: From Sept 2025 onwards
-                startDate = new Date(2025, 8, 1); // Month is 0-indexed. 8 is Sept.
-                endDate = new Date(2099, 11, 31); // Far future
+                startDate = new Date(2025, 8, 1); // 2025年9月1日
+                endDate = new Date(2099, 11, 31);
             } else {
-                const days = parseInt(rangeVal);
-                endDate = new Date(refDate);
-                endDate.setDate(refDate.getDate() + days);
+                endDate.setDate(refDate.getDate() + parseInt(rangeVal));
             }
 
-            // Count lessons per tutor within range
             const tutorCounts = {};
-
             rawData.forEach(row => {
-                const lessonDate = parseDate(row['日期']); // Column D
-                const tutorStr = row['導師']; // Column G
-
+                const lessonDate = parseDate(row['日期']);
+                const tutorStr = row['導師'];
                 if (lessonDate && tutorStr) {
-                    // Check date range
-                    // Logic: StartDate <= LessonDate <= EndDate (approximately)
-                    // For "Next X days", we usually mean from RefDate onwards.
-                    
-                    let isInRange = false;
-                    if (rangeVal === 'schoolYear') {
-                         if (lessonDate >= startDate) isInRange = true;
-                    } else {
-                        // For 1 week, 2 weeks etc. starting from today (RefDate)
-                        if (lessonDate >= startDate && lessonDate <= endDate) isInRange = true;
-                    }
-
-                    if (isInRange) {
-                        // Handle Split Tutors (Harry/Zoe)
+                    if (lessonDate >= startDate && lessonDate <= endDate) {
                         const tutors = tutorStr.split('/').map(t => t.trim());
-                        tutors.forEach(t => {
-                            if (!t) return;
-                            tutorCounts[t] = (tutorCounts[t] || 0) + 1;
-                        });
+                        tutors.forEach(t => { if(t) tutorCounts[t] = (tutorCounts[t] || 0) + 1; });
                     }
                 }
             });
 
-            // Convert to array and sort
-            const sortedTutors = Object.entries(tutorCounts)
-                .sort((a, b) => b[1] - a[1]);
-
-            // Render
+            const sorted = Object.entries(tutorCounts).sort((a, b) => b[1] - a[1]);
             const tbody = document.getElementById('leaderboardBody');
-            tbody.innerHTML = '';
+            tbody.innerHTML = sorted.length ? '' : '<tr><td colspan="3" class="text-center py-4 text-gray-400">此時段無課堂</td></tr>';
             
-            if (sortedTutors.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">此時段無課堂</td></tr>';
-                return;
-            }
-
-            sortedTutors.forEach((item, index) => {
-                const rank = index + 1;
-                let rankClass = "text-gray-600 font-bold";
-                let icon = "";
-                if (rank === 1) { rankClass = "text-yellow-500 font-bold text-lg"; icon = "👑 "; }
-                if (rank === 2) { rankClass = "text-gray-400 font-bold text-lg"; }
-                if (rank === 3) { rankClass = "text-orange-400 font-bold text-lg"; }
-
-                const row = `
+            sorted.forEach(([name, count], i) => {
+                const rank = i + 1;
+                tbody.innerHTML += `
                     <tr class="border-b last:border-0 hover:bg-gray-50">
-                        <td class="py-2 ${rankClass}">${icon}#${rank}</td>
-                        <td class="py-2 font-medium">${item[0]}</td>
-                        <td class="py-2 text-right">${item[1]}</td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
+                        <td class="py-2 font-bold ${rank<=3?'text-blue-500':''}">#${rank}</td>
+                        <td class="py-2 font-medium">${name}</td>
+                        <td class="py-2 text-right">${count}</td>
+                    </tr>`;
             });
         }
 
-        // --- 5. General Stats Logic ---
         function updateGeneralStats(refDate) {
-            let total = 0;
-            let completed = 0;
-            let remaining = 0;
+            let total = 0, completed = 0, remaining = 0;
             const courseTypes = {};
 
             rawData.forEach(row => {
                 const lessonDate = parseDate(row['日期']);
-                const courseName = row['課程']; // Column B
-
+                const courseName = row['課程'];
                 if (lessonDate && courseName) {
                     total++;
-                    
-                    // Logic: Completed if Date < RefDate. 
-                    // Note: If Date == RefDate (Today), is it completed? 
-                    // Usually Dashboard "Today" implies "Scheduled for today". 
-                    // Let's assume < Today is completed, >= Today is remaining/upcoming.
-                    
-                    // Reset time parts for pure date comparison
-                    const dDate = new Date(lessonDate.getFullYear(), lessonDate.getMonth(), lessonDate.getDate());
-                    const rDate = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
-
-                    if (dDate < rDate) {
-                        completed++;
-                    } else {
-                        remaining++;
-                    }
-
-                    // Course Type Count
+                    if (lessonDate < refDate) completed++;
+                    else remaining++;
                     courseTypes[courseName] = (courseTypes[courseName] || 0) + 1;
                 }
             });
 
-            // DOM Updates
             document.getElementById('totalLessons').innerText = total;
             document.getElementById('completedLessons').innerText = completed;
             document.getElementById('remainingLessons').innerText = remaining;
+            
+            const percent = total ? Math.round((completed / total) * 100) : 0;
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressText').innerText = percent + '%';
 
-            // Progress Bar
-            const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
-            document.getElementById('progressBar').style.width = `${percent}%`;
-            document.getElementById('progressText').innerText = `${percent}%`;
-
-            // Chart
-            renderChart('generalChart', courseTypes, generalChartInstance, (newInstance) => { generalChartInstance = newInstance; });
+            renderChart('generalChart', courseTypes, generalChartInstance, (ni) => generalChartInstance = ni);
         }
 
-        // --- 6. Individual Tutor Logic ---
-        
-        // 6.1 Populate Dropdown
         function updateTutorList() {
             const select = document.getElementById('tutorSelect');
-            // Check if already populated to avoid resetting selection on date change if not needed
-            // But we might want to refresh if CSV changes (not implemented here).
-            // We'll simplisticly check if it has > 1 options.
             if (select.options.length > 1) return;
-
-            const uniqueTutors = new Set();
+            const tutors = new Set();
             rawData.forEach(row => {
-                const tStr = row['導師'];
-                if (tStr) {
-                    tStr.split('/').forEach(t => uniqueTutors.add(t.trim()));
-                }
+                if (row['導師']) row['導師'].split('/').forEach(t => tutors.add(t.trim()));
             });
-
-            const sorted = Array.from(uniqueTutors).sort();
-            sorted.forEach(t => {
-                if(!t) return;
-                const opt = document.createElement('option');
-                opt.value = t;
-                opt.innerText = t;
-                select.appendChild(opt);
+            Array.from(tutors).sort().forEach(t => {
+                const opt = new Array(0);
+                select.add(new Option(t, t));
             });
         }
 
-        // 6.2 Show Stats
         function updateTutorStats(refDate) {
             const tutorName = document.getElementById('tutorSelect').value;
             const container = document.getElementById('tutorStatsContainer');
-            const emptyState = document.getElementById('tutorEmptyState');
+            const empty = document.getElementById('tutorEmptyState');
 
-            if (!tutorName) {
-                container.classList.add('hidden');
-                emptyState.classList.remove('hidden');
-                return;
-            }
+            if (!tutorName) { container.classList.add('hidden'); empty.classList.remove('hidden'); return; }
+            container.classList.remove('hidden'); empty.classList.add('hidden');
 
-            container.classList.remove('hidden');
-            emptyState.classList.add('hidden');
-
-            let total = 0;
-            let completed = 0;
-            let remaining = 0;
+            let total = 0, completed = 0, remaining = 0;
             const courseTypes = {};
 
             rawData.forEach(row => {
                 const lessonDate = parseDate(row['日期']);
-                const tStr = row['導師'];
-                const courseName = row['課程'];
-
-                if (lessonDate && tStr && tStr.includes(tutorName)) {
-                    // Strict check or partial? "Harry" in "Harry/Zoe" is true.
-                    // But "Harry" in "Harry Potter" is also true. 
-                    // We split to be precise.
-                    const tutors = tStr.split('/').map(t => t.trim());
-                    if (tutors.includes(tutorName)) {
-                        total++;
-
-                        const dDate = new Date(lessonDate.getFullYear(), lessonDate.getMonth(), lessonDate.getDate());
-                        const rDate = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
-
-                        if (dDate < rDate) {
-                            completed++;
-                        } else {
-                            remaining++;
-                        }
-
-                        courseTypes[courseName] = (courseTypes[courseName] || 0) + 1;
-                    }
+                const tStr = row['導師'] || '';
+                if (lessonDate && tStr.split('/').map(s=>s.trim()).includes(tutorName)) {
+                    total++;
+                    if (lessonDate < refDate) completed++;
+                    else remaining++;
+                    courseTypes[row['課程']] = (courseTypes[row['課程']] || 0) + 1;
                 }
             });
 
             document.getElementById('tutorTotal').innerText = total;
             document.getElementById('tutorCompleted').innerText = completed;
             document.getElementById('tutorRemaining').innerText = remaining;
-
-            renderChart('tutorChart', courseTypes, tutorChartInstance, (newInstance) => { tutorChartInstance = newInstance; });
+            renderChart('tutorChart', courseTypes, tutorChartInstance, (ni) => tutorChartInstance = ni);
         }
 
-        // --- 7. Chart Rendering Helper ---
-        function renderChart(canvasId, dataObj, currentInstance, setInstanceCallback) {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            
-            if (currentInstance) {
-                currentInstance.destroy();
-            }
-
+        function renderChart(id, dataObj, instance, setInst) {
+            if (instance) instance.destroy();
             const labels = Object.keys(dataObj);
-            const dataValues = Object.values(dataObj);
-            
-            // Generate nice colors
-            const bgColors = [
-                '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
-                '#EC4899', '#6366F1', '#14B8A6', '#F97316', '#64748B'
-            ];
-
-            const newChart = new Chart(ctx, {
+            if (labels.length === 0) return;
+            const ctx = document.getElementById(id).getContext('2d');
+            const ni = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: labels,
                     datasets: [{
-                        data: dataValues,
-                        backgroundColor: bgColors.slice(0, labels.length),
-                        borderWidth: 1
+                        data: Object.values(dataObj),
+                        backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { boxWidth: 12, font: { size: 10 } }
-                        }
-                    }
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
             });
-
-            setInstanceCallback(newChart);
+            setInst(ni);
         }
-
-        // --- 8. Initialization ---
 
         window.addEventListener('DOMContentLoaded', () => {
             setToday();
-
             Papa.parse(SHEET_CSV_URL, {
                 download: true,
-                header: true, // Uses first row as keys (學校, 課程...)
-                complete: function(results) {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
                     rawData = results.data;
                     document.getElementById('loading').style.display = 'none';
                     processData();
-                },
-                error: function(err) {
-                    alert("無法讀取資料，請檢查網絡或 Google Sheet 權限。");
-                    console.error(err);
-                    document.getElementById('loading').style.display = 'none';
                 }
             });
 
-            // Listeners
             document.getElementById('datePicker').addEventListener('change', processData);
-            document.getElementById('leaderboardRange').addEventListener('change', () => {
-                const selectedDateStr = document.getElementById('datePicker').value;
-                updateLeaderboard(new Date(selectedDateStr));
-            });
-            document.getElementById('tutorSelect').addEventListener('change', () => {
-                const selectedDateStr = document.getElementById('datePicker').value;
-                updateTutorStats(new Date(selectedDateStr));
-            });
+            document.getElementById('leaderboardRange').addEventListener('change', processData);
+            document.getElementById('tutorSelect').addEventListener('change', processData);
         });
-
     </script>
 </body>
 </html>
