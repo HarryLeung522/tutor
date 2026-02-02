@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>派克導師提示器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; }
+        body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: #f4f7f6; color: #333; line-height: 1.6; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: var(--primary); margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .setup-box { background: #ebf5fb; padding: 20px; border-radius: 10px; margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; }
+        input[type="date"] { padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; }
+        .btn { background: var(--accent); color: white; border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
+        .btn:hover { background: #2980b9; transform: translateY(-1px); }
+        #status { text-align: center; margin: 10px 0; font-weight: bold; color: #666; }
+        .tutor-card { background: #fff; border: 1px solid #e1e4e8; border-radius: 10px; margin-bottom: 25px; overflow: hidden; }
+        .tutor-header { background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .tutor-content { padding: 20px; white-space: pre-wrap; background: #fafafa; font-family: monospace; font-size: 14px; }
+        .copy-btn { background: var(--success); color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .error-msg { color: #e74c3c; background: #fdf2f2; padding: 15px; border-radius: 8px; margin: 10px 0; display: none; border-left: 5px solid #e74c3c; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>派克導師提示器</h1>
+
+    <div class="setup-box">
+        <label>選擇起始日期：</label>
+        <input type="date" id="targetDate">
+        <button class="btn" onclick="loadData()">生成提示字句</button>
+    </div>
+
+    <div id="errorArea" class="error-msg"></div>
+    <div id="status"></div>
+    <div id="output"></div>
+</div>
+
+<script>
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZu (此處略過，程式碼會使用完整URL)';
+    // 直接使用你提供的完整 URL
+    const FULL_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv';
+
+    window.onload = () => {
+        document.getElementById('targetDate').valueAsDate = new Date();
+    };
+
+    async function loadData() {
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const errorArea = document.getElementById('errorArea');
+        const selectedDateStr = document.getElementById('targetDate').value;
+
+        output.innerHTML = '';
+        errorArea.style.display = 'none';
+        status.innerText = '正在嘗試讀取雲端資料...';
+
+        try {
+            // 使用 no-cache 確保數據最新
+            const response = await fetch(FULL_URL, { cache: "no-cache" });
+            if (!response.ok) throw new Error('無法連線到資料來源');
+            
+            const text = await response.text();
+            
+            Papa.parse(text, {
+                header: false,
+                skipEmptyLines: true,
+                complete: (results) => processData(results.data, selectedDateStr)
+            });
+        } catch (err) {
+            status.innerText = '';
+            errorArea.style.display = 'block';
+            errorArea.innerHTML = `
+                <strong>讀取失敗：</strong> 由於瀏覽器安全政策（CORS），無法直接抓取。 <br>
+                <strong>解決方法：</strong> <br>
+                1. 請將此 HTML 檔案上傳到伺服器 (如 GitHub Pages)。<br>
+                2. 或者使用 Chrome 插件 (如 Allow CORS) 開放權限。<br>
+                3. 直接在網址列打開 CSV 連結，確認是否有下載檔案。
+            `;
+        }
+    }
+
+    function processData(rows, startStr) {
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const start = new Date(startStr);
+        start.setHours(0,0,0,0);
+        
+        const end = new Date(start);
+        end.setDate(end.getDate() + 7);
+        end.setHours(23,59,59,999);
+
+        const tutorGroups = {};
+
+        // 資料索引：0學校, 1課程, 2第幾堂, 3日期, 4星期, 5時間, 6導師
+        rows.forEach((row, idx) => {
+            if (idx === 0 || row.length < 7) return; 
+
+            const rowDate = new Date(row[3]);
+            const tutorName = row[6]?.trim();
+
+            if (!isNaN(rowDate) && rowDate >= start && rowDate <= end && tutorName) {
+                if (!tutorGroups[tutorName]) tutorGroups[tutorName] = [];
+                tutorGroups[tutorName].push({
+                    date: row[3],
+                    day: row[4],
+                    school: row[0],
+                    course: row[1],
+                    lesson: row[2],
+                    time: row[5],
+                    ts: rowDate.getTime()
+                });
+            }
+        });
+
+        const sortedTutors = Object.keys(tutorGroups).sort();
+        
+        if (sortedTutors.length === 0) {
+            status.innerText = '⚠️ 所選日期後 7 天內沒有找到任何課程。';
+            return;
+        }
+
+        status.innerText = `✅ 成功生成 ${sortedTutors.length} 位導師的提示文字`;
+
+        sortedTutors.forEach(name => {
+            const lessons = tutorGroups[name].sort((a, b) => a.ts - b.ts);
+            let lessonDetails = "";
+            lessons.forEach(l => {
+                lessonDetails += `“${l.date}”, “${l.day}”, ${l.school}、 ${l.course}、第 ${l.lesson} 堂, 上課時間 ${l.time}\n`;
+            });
+
+            const finalText = `你好，${name}，以下為本星期需要教授的課程：\n${lessonDetails}如有問題，請隨時告知，謝謝！`;
+
+            const card = document.createElement('div');
+            card.className = 'tutor-card';
+            card.innerHTML = `
+                <div class="tutor-header">
+                    <span>導師：${name}</span>
+                    <button class="copy-btn" onclick="copyToClipboard(this, \`${finalText.replace(/`/g, '\\`')}\`)">複製字句</button>
+                </div>
+                <div class="tutor-content">${finalText}</div>
+            `;
+            output.appendChild(card);
+        });
+    }
+
+    function copyToClipboard(btn, text) {
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        
+        const original = btn.innerText;
+        btn.innerText = '✅ 已複製';
+        setTimeout(() => btn.innerText = original, 2000);
+    }
+</script>
+</body>
+</html>
