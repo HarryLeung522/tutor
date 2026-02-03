@@ -3,230 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>派克Dashboard - 完整修正版</title>
+    <title>派克學年Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 1.5rem; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; }
     </style>
 </head>
 <body class="p-4 md:p-6">
 
     <div id="loading" class="fixed inset-0 bg-white flex flex-col justify-center items-center z-50">
-        <div class="text-xl font-bold text-blue-600 mb-2 animate-pulse">數據分析中...</div>
-        <div id="debugInfo" class="text-xs text-gray-400 font-mono">正在檢查 Google Sheet 欄位格式</div>
+        <div class="text-xl font-bold text-blue-600 animate-bounce">正在生成學年數據...</div>
     </div>
 
-    <div class="max-w-7xl mx-auto space-y-6">
+    <div class="max-w-[1600px] mx-auto space-y-6">
         
-        <div class="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm">
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">派克Dashboard</h1>
-            <div class="flex items-center space-x-2 mt-4 md:mt-0">
-                <label class="font-medium text-gray-600 text-sm">基準日期：</label>
-                <input type="date" id="datePicker" class="border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        <div class="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-600">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">派克學年 Dashboard (2025-2026)</h1>
+                <p class="text-sm text-gray-500">數據範圍：2025/09 - 2026/08</p>
             </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="card text-center">
-                <div class="text-gray-500 text-sm">總班數</div>
-                <div id="totalLessons" class="text-3xl font-bold text-blue-600">0</div>
-            </div>
-            <div class="card text-center border-b-4 border-green-500">
-                <div class="text-gray-500 text-sm">已完成班級</div>
-                <div id="completedLessons" class="text-3xl font-bold text-green-500">0</div>
-            </div>
-            <div class="card text-center">
-                <div class="text-gray-500 text-sm">剩餘班級</div>
-                <div id="remainingLessons" class="text-3xl font-bold text-gray-400">0</div>
+            <div class="flex items-center space-x-3 mt-4 md:mt-0">
+                <label class="font-medium text-gray-600">基準日期：</label>
+                <input type="date" id="datePicker" class="border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
             </div>
         </div>
 
         <div class="card">
-            <div class="flex justify-between mb-2">
-                <span class="text-sm font-semibold text-blue-700">總體進度 (已上 / 總班數)</span>
+            <div class="flex justify-between mb-2 italic">
+                <span class="text-sm font-semibold text-blue-700">學年總進度 (已上完 / 全年總班數)</span>
                 <span id="progressText" class="text-sm font-bold text-blue-700">0%</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-4">
-                <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all duration-700" style="width: 0%"></div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+                <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-1000" style="width: 0%"></div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="card">
-                <h2 class="text-xl font-bold mb-4 border-b pb-2 text-gray-700"><i class="fas fa-medal mr-2"></i>導師班數排行</h2>
-                <div class="overflow-y-auto max-h-72">
-                    <table class="w-full">
-                        <tbody id="leaderboardBody" class="divide-y divide-gray-100"></tbody>
+                <h2 class="text-lg font-bold mb-4 border-b pb-2 text-gray-700">導師累積班數排行</h2>
+                <div class="overflow-y-auto max-h-[350px]">
+                    <table class="w-full text-sm">
+                        <tbody id="leaderboardBody" class="divide-y"></tbody>
                     </table>
                 </div>
             </div>
+
             <div class="card flex flex-col items-center">
-                <h2 class="text-xl font-bold mb-4 w-full border-b pb-2 text-gray-700">課程類型分佈</h2>
-                <div class="w-full h-64 relative"><canvas id="generalChart"></canvas></div>
+                <h2 class="text-lg font-bold mb-4 w-full border-b pb-2 text-gray-700">課程分佈</h2>
+                <div class="w-full h-[300px]"><canvas id="generalChart"></canvas></div>
+            </div>
+
+            <div class="card flex flex-col">
+                <h2 class="text-lg font-bold mb-4 border-b pb-2 text-gray-700">學年月份流量趨勢</h2>
+                <div class="w-full h-[300px]"><canvas id="monthlyLineChart"></canvas></div>
             </div>
         </div>
 
         <div class="card">
             <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-2">
-                <h2 class="text-xl font-bold text-gray-700">導師個人詳細數據</h2>
-                <select id="tutorSelect" class="mt-2 md:mt-0 border rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-indigo-500">
-                    <option value="">-- 請選擇導師 --</option>
+                <h2 class="text-xl font-bold text-gray-700">導師個人數據分析</h2>
+                <select id="tutorSelect" class="mt-2 md:mt-0 border rounded-lg px-6 py-2 bg-blue-50 font-bold text-blue-800">
+                    <option value="">-- 選擇導師 --</option>
                 </select>
             </div>
-            <div id="tutorStatsContainer" class="hidden">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                    <div class="space-y-4">
-                        <div class="flex justify-between p-4 bg-indigo-50 rounded-xl">
-                            <span class="text-indigo-700 font-medium">個人總負責班數</span>
-                            <span id="tutorTotal" class="text-2xl font-bold text-indigo-900">0</span>
-                        </div>
-                        <div class="flex justify-between p-4 bg-green-50 rounded-xl">
-                            <span class="text-green-700 font-medium">個人已上完</span>
-                            <span id="tutorCompleted" class="text-2xl font-bold text-green-900">0</span>
-                        </div>
-                        <div class="flex justify-between p-4 bg-gray-50 rounded-xl">
-                            <span class="text-gray-600 font-medium">個人剩餘</span>
-                            <span id="tutorRemaining" class="text-2xl font-bold text-gray-800">0</span>
-                        </div>
+            
+            <div id="tutorStatsContainer" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="space-y-4">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <div class="text-gray-500 text-sm">個人全年總班數</div>
+                        <div id="tutorTotal" class="text-3xl font-bold text-gray-800">0</div>
                     </div>
-                    <div class="h-64 relative"><canvas id="tutorChart"></canvas></div>
+                    <div class="p-4 bg-green-50 rounded-lg">
+                        <div class="text-green-600 text-sm">個人已完成</div>
+                        <div id="tutorCompleted" class="text-3xl font-bold text-green-700">0</div>
+                    </div>
+                    <div class="p-4 bg-orange-50 rounded-lg">
+                        <div class="text-orange-600 text-sm">個人待進行</div>
+                        <div id="tutorRemaining" class="text-3xl font-bold text-orange-700">0</div>
+                    </div>
                 </div>
+                <div class="h-[300px]"><canvas id="tutorPieChart"></canvas></div>
+                <div class="h-[300px]"><canvas id="tutorLineChart"></canvas></div>
             </div>
-            <div id="tutorEmptyState" class="text-center text-gray-400 py-10">請從上方選單選擇一位導師查看詳情</div>
+            <div id="tutorEmptyState" class="text-center text-gray-400 py-20 bg-gray-50 rounded-xl border-2 border-dashed">
+                請選擇導師以檢視該員之 2025-2026 學年表現
+            </div>
         </div>
     </div>
 
     <script>
         const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv";
         let rawData = [];
-        let generalChart = null;
-        let tutorChart = null;
+        let charts = {};
+        // 定義學年月份標籤
+        const ACADEMIC_MONTHS = ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"];
 
-        // 日期解析器
-        function parseChineseDate(str) {
+        function parseDate(str) {
             if (!str) return null;
-            str = str.trim();
             const match = str.match(/(\d+)年(\d+)月(\d+)日/);
-            if (match) return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            if (match) return new Date(match[1], match[2]-1, match[3]);
             const d = new Date(str);
             return isNaN(d.getTime()) ? null : d;
         }
 
-        // 欄位匹配器
-        function getRowValue(row, possibleKeys) {
-            for (let k of possibleKeys) {
-                if (row[k] !== undefined) return row[k];
-            }
+        function getVal(row, keys) {
+            for (let k of keys) if (row[k] !== undefined) return row[k];
             return "";
         }
 
         async function init() {
-            const today = new Date();
-            document.getElementById('datePicker').value = today.toISOString().split('T')[0];
-
+            document.getElementById('datePicker').value = new Date().toISOString().split('T')[0];
             Papa.parse(SHEET_URL, {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                transformHeader: h => h.trim(),
+                download: true, header: true, skipEmptyLines: true, transformHeader: h => h.trim(),
                 complete: (results) => {
                     rawData = results.data;
                     document.getElementById('loading').style.display = 'none';
-                    populateTutorDropdown();
-                    updateDashboard();
+                    initTutorSelect();
+                    updateAll();
                 }
             });
         }
 
-        function populateTutorDropdown() {
-            const select = document.getElementById('tutorSelect');
-            const tutors = new Set();
-            rawData.forEach(row => {
-                const val = getRowValue(row, ['導師', 'Tutor', 'tutor']);
-                if (val) val.split('/').forEach(t => tutors.add(t.trim()));
+        function initTutorSelect() {
+            const s = document.getElementById('tutorSelect');
+            const ts = new Set();
+            rawData.forEach(r => {
+                const v = getVal(r, ['導師']);
+                if (v) v.split('/').forEach(name => ts.add(name.trim()));
             });
-            Array.from(tutors).sort().forEach(t => select.add(new Option(t, t)));
+            Array.from(ts).sort().forEach(n => s.add(new Option(n, n)));
         }
 
-        function updateDashboard() {
+        function updateAll() {
             const refDate = new Date(document.getElementById('datePicker').value);
-            refDate.setHours(0, 0, 0, 0);
+            refDate.setHours(0,0,0,0);
 
             let total = 0, done = 0;
-            const tutorCounts = {};
-            const courseCounts = {};
+            const tutorRank = {}, courseDist = {}, monthCounts = {};
+            ACADEMIC_MONTHS.forEach(m => monthCounts[m] = 0);
 
-            rawData.forEach(row => {
-                const dateStr = getRowValue(row, ['日期', 'Date', 'date']);
-                const d = parseChineseDate(dateStr);
-                
+            rawData.forEach(r => {
+                const d = parseDate(getVal(r, ['日期']));
                 if (d) {
                     total++;
                     if (d < refDate) done++;
-                    
-                    const tVal = getRowValue(row, ['導師', 'Tutor']);
-                    if (tVal) {
-                        tVal.split('/').forEach(t => {
-                            const n = t.trim();
-                            if (n) tutorCounts[n] = (tutorCounts[n] || 0) + 1;
-                        });
-                    }
 
-                    const cVal = getRowValue(row, ['課程', 'Course']) || "未分類";
-                    courseCounts[cVal] = (courseCounts[cVal] || 0) + 1;
+                    // 月份統計 (格式 YYYY-MM)
+                    const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                    if (monthCounts[mKey] !== undefined) monthCounts[mKey]++;
+
+                    // 導師與課程
+                    const tVal = getVal(r, ['導師']);
+                    if (tVal) tVal.split('/').forEach(n => {
+                        n = n.trim();
+                        if(n) tutorRank[n] = (tutorRank[n] || 0) + 1;
+                    });
+                    const cVal = getVal(r, ['課程']) || "未分類";
+                    courseDist[cVal] = (courseDist[cVal] || 0) + 1;
                 }
             });
 
-            // 1. 更新卡片與進度條
-            document.getElementById('totalLessons').innerText = total;
-            document.getElementById('completedLessons').innerText = done;
-            document.getElementById('remainingLessons').innerText = total - done;
+            // 更新 UI
+            const p = total ? Math.round((done/total)*100) : 0;
+            document.getElementById('progressBar').style.width = p + '%';
+            document.getElementById('progressText').innerText = p + '%';
             
-            const percent = total ? Math.round((done / total) * 100) : 0;
-            document.getElementById('progressBar').style.width = percent + '%';
-            document.getElementById('progressText').innerText = percent + '%';
+            const sorted = Object.entries(tutorRank).sort((a,b)=>b[1]-a[1]);
+            document.getElementById('leaderboardBody').innerHTML = sorted.map(([n,c]) => `<tr><td class="py-2">${n}</td><td class="text-right font-bold text-blue-600">${c} 班</td></tr>`).join('');
 
-            // 2. 更新排行榜
-            const sorted = Object.entries(tutorCounts).sort((a,b) => b[1] - a[1]);
-            document.getElementById('leaderboardBody').innerHTML = sorted.map(([name, count]) => `
-                <tr class="hover:bg-gray-50"><td class="py-3 font-medium text-gray-700">${name}</td><td class="text-right font-bold text-blue-600">${count} 班</td></tr>
-            `).join('');
-
-            // 3. 更新總圖表
-            renderPieChart('generalChart', courseCounts, (c) => generalChart = c, generalChart);
-            
-            // 4. 更新導師個人數據
-            updateIndividualStats(refDate);
+            // 更新圖表
+            renderPie('generalChart', courseDist);
+            renderLine('monthlyLineChart', monthCounts, "全校課堂趨勢", "#3b82f6");
+            updateIndividual(refDate);
         }
 
-        function updateIndividualStats(refDate) {
+        function updateIndividual(refDate) {
             const name = document.getElementById('tutorSelect').value;
             const container = document.getElementById('tutorStatsContainer');
             const empty = document.getElementById('tutorEmptyState');
-
-            if (!name) {
-                container.classList.add('hidden');
-                empty.classList.remove('hidden');
-                return;
-            }
-
-            container.classList.remove('hidden');
-            empty.classList.add('hidden');
+            if (!name) { container.classList.add('hidden'); empty.classList.remove('hidden'); return; }
+            container.classList.remove('hidden'); empty.classList.add('hidden');
 
             let tTotal = 0, tDone = 0;
-            const tCourses = {};
+            const tCourses = {}, tMonths = {};
+            ACADEMIC_MONTHS.forEach(m => tMonths[m] = 0);
 
-            rawData.forEach(row => {
-                const tutors = getRowValue(row, ['導師', 'Tutor']).split('/').map(s => s.trim());
+            rawData.forEach(r => {
+                const tutors = getVal(r, ['導師']).split('/').map(s=>s.trim());
                 if (tutors.includes(name)) {
-                    const d = parseChineseDate(getRowValue(row, ['日期', 'Date']));
+                    const d = parseDate(getVal(r, ['日期']));
                     if (d) {
                         tTotal++;
                         if (d < refDate) tDone++;
-                        const c = getRowValue(row, ['課程', 'Course']) || "其他";
+                        const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                        if (tMonths[mKey] !== undefined) tMonths[mKey]++;
+                        const c = getVal(r, ['課程']) || "其他";
                         tCourses[c] = (tCourses[c] || 0) + 1;
                     }
                 }
@@ -236,32 +210,48 @@
             document.getElementById('tutorCompleted').innerText = tDone;
             document.getElementById('tutorRemaining').innerText = tTotal - tDone;
 
-            renderPieChart('tutorChart', tCourses, (c) => tutorChart = c, tutorChart);
+            renderPie('tutorPieChart', tCourses);
+            renderLine('tutorLineChart', tMonths, "個人課堂趨勢", "#6366f1");
         }
 
-        function renderPieChart(canvasId, dataObj, setChart, existingChart) {
-            if (existingChart) existingChart.destroy();
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            const labels = Object.keys(dataObj);
-            if (labels.length === 0) return;
-
-            const newChart = new Chart(ctx, {
+        function renderPie(id, dataObj) {
+            if (charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), {
                 type: 'doughnut',
                 data: {
-                    labels: labels,
-                    datasets: [{
-                        data: Object.values(dataObj),
-                        backgroundColor: ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
-                    }]
+                    labels: Object.keys(dataObj),
+                    datasets: [{ data: Object.values(dataObj), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'] }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
             });
-            setChart(newChart);
         }
 
-        document.getElementById('datePicker').onchange = updateDashboard;
-        document.getElementById('tutorSelect').onchange = () => updateIndividualStats(new Date(document.getElementById('datePicker').value));
-        
+        function renderLine(id, dataObj, label, color) {
+            if (charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), {
+                type: 'line',
+                data: {
+                    labels: ACADEMIC_MONTHS.map(m => m.split('-')[1] + '月'),
+                    datasets: [{
+                        label: label,
+                        data: Object.values(dataObj),
+                        borderColor: color,
+                        backgroundColor: color + '22',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+
+        document.getElementById('datePicker').onchange = updateAll;
+        document.getElementById('tutorSelect').onchange = updateAll;
         init();
     </script>
 </body>
