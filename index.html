@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>派克學年Dashboard</title>
+    <title>派克學年Dashboard - H欄精確版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
@@ -15,15 +15,15 @@
 <body class="p-4 md:p-6">
 
     <div id="loading" class="fixed inset-0 bg-white flex flex-col justify-center items-center z-50">
-        <div class="text-xl font-bold text-blue-600 animate-bounce">正在生成學年數據...</div>
+        <div class="text-xl font-bold text-blue-600 animate-bounce">正在讀取 H 欄數據...</div>
     </div>
 
     <div class="max-w-[1600px] mx-auto space-y-6">
         
         <div class="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-600">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800">派克學年 Dashboard (2025-2026)</h1>
-                <p class="text-sm text-gray-500">數據範圍：2025/09 - 2026/08</p>
+                <h1 class="text-2xl font-bold text-gray-800">派克學年 Dashboard (H欄基準)</h1>
+                <p class="text-sm text-gray-500">當前統計基準：Google Sheet 第 H 欄</p>
             </div>
             <div class="flex items-center space-x-3 mt-4 md:mt-0">
                 <label class="font-medium text-gray-600">基準日期：</label>
@@ -32,12 +32,12 @@
         </div>
 
         <div class="card">
-            <div class="flex justify-between mb-2 italic">
-                <span class="text-sm font-semibold text-blue-700">學年總進度 (已上完 / 全年總班數)</span>
-                <span id="progressText" class="text-sm font-bold text-blue-700">0%</span>
+            <div class="flex justify-between mb-2">
+                <span class="text-sm font-semibold text-blue-700">學年總進度</span>
+                <span id="progressDetail" class="text-sm font-bold text-blue-700">0 / 0 課堂 (0%)</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-3">
-                <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-1000" style="width: 0%"></div>
+            <div class="w-full bg-gray-200 rounded-full h-4 shadow-inner">
+                <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all duration-1000" style="width: 0%"></div>
             </div>
         </div>
 
@@ -50,12 +50,10 @@
                     </table>
                 </div>
             </div>
-
             <div class="card flex flex-col items-center">
                 <h2 class="text-lg font-bold mb-4 w-full border-b pb-2 text-gray-700">課程分佈</h2>
                 <div class="w-full h-[300px]"><canvas id="generalChart"></canvas></div>
             </div>
-
             <div class="card flex flex-col">
                 <h2 class="text-lg font-bold mb-4 border-b pb-2 text-gray-700">學年月份流量趨勢</h2>
                 <div class="w-full h-[300px]"><canvas id="monthlyLineChart"></canvas></div>
@@ -64,7 +62,7 @@
 
         <div class="card">
             <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-2">
-                <h2 class="text-xl font-bold text-gray-700">導師個人數據分析</h2>
+                <h2 class="text-xl font-bold text-gray-700">導師個人數據分析 (25/26 學年)</h2>
                 <select id="tutorSelect" class="mt-2 md:mt-0 border rounded-lg px-6 py-2 bg-blue-50 font-bold text-blue-800">
                     <option value="">-- 選擇導師 --</option>
                 </select>
@@ -89,7 +87,7 @@
                 <div class="h-[300px]"><canvas id="tutorLineChart"></canvas></div>
             </div>
             <div id="tutorEmptyState" class="text-center text-gray-400 py-20 bg-gray-50 rounded-xl border-2 border-dashed">
-                請選擇導師以檢視該員之 2025-2026 學年表現
+                請選擇導師以檢視詳細數據
             </div>
         </div>
     </div>
@@ -98,8 +96,13 @@
         const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv";
         let rawData = [];
         let charts = {};
-        // 定義學年月份標籤
         const ACADEMIC_MONTHS = ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"];
+
+        // 強制讀取特定位置或標籤
+        function getHColValue(row) {
+            // 優先找標籤「導師」，若無則找第 8 個欄位 (索引 7)
+            return row['導師'] || Object.values(row)[7] || "";
+        }
 
         function parseDate(str) {
             if (!str) return null;
@@ -107,11 +110,6 @@
             if (match) return new Date(match[1], match[2]-1, match[3]);
             const d = new Date(str);
             return isNaN(d.getTime()) ? null : d;
-        }
-
-        function getVal(row, keys) {
-            for (let k of keys) if (row[k] !== undefined) return row[k];
-            return "";
         }
 
         async function init() {
@@ -131,7 +129,7 @@
             const s = document.getElementById('tutorSelect');
             const ts = new Set();
             rawData.forEach(r => {
-                const v = getVal(r, ['導師']);
+                const v = getHColValue(r);
                 if (v) v.split('/').forEach(name => ts.add(name.trim()));
             });
             Array.from(ts).sort().forEach(n => s.add(new Option(n, n)));
@@ -146,37 +144,37 @@
             ACADEMIC_MONTHS.forEach(m => monthCounts[m] = 0);
 
             rawData.forEach(r => {
-                const d = parseDate(getVal(r, ['日期']));
+                const dateVal = r['日期'] || Object.values(r)[0]; // 假設日期在第一欄
+                const d = parseDate(dateVal);
                 if (d) {
                     total++;
                     if (d < refDate) done++;
 
-                    // 月份統計 (格式 YYYY-MM)
                     const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                     if (monthCounts[mKey] !== undefined) monthCounts[mKey]++;
 
-                    // 導師與課程
-                    const tVal = getVal(r, ['導師']);
+                    // 關鍵：使用 H 欄數據統計導師
+                    const tVal = getHColValue(r);
                     if (tVal) tVal.split('/').forEach(n => {
                         n = n.trim();
                         if(n) tutorRank[n] = (tutorRank[n] || 0) + 1;
                     });
-                    const cVal = getVal(r, ['課程']) || "未分類";
+                    
+                    const cVal = r['課程'] || Object.values(r)[1] || "未分類";
                     courseDist[cVal] = (courseDist[cVal] || 0) + 1;
                 }
             });
 
-            // 更新 UI
+            // 更新 Progress Bar 文字 (顯示數量與百分比)
             const p = total ? Math.round((done/total)*100) : 0;
             document.getElementById('progressBar').style.width = p + '%';
-            document.getElementById('progressText').innerText = p + '%';
+            document.getElementById('progressDetail').innerText = `${done} / ${total} 課堂 (${p}%)`;
             
             const sorted = Object.entries(tutorRank).sort((a,b)=>b[1]-a[1]);
             document.getElementById('leaderboardBody').innerHTML = sorted.map(([n,c]) => `<tr><td class="py-2">${n}</td><td class="text-right font-bold text-blue-600">${c} 班</td></tr>`).join('');
 
-            // 更新圖表
             renderPie('generalChart', courseDist);
-            renderLine('monthlyLineChart', monthCounts, "全校課堂趨勢", "#3b82f6");
+            renderLine('monthlyLineChart', monthCounts, "全校趨勢", "#3b82f6");
             updateIndividual(refDate);
         }
 
@@ -192,15 +190,16 @@
             ACADEMIC_MONTHS.forEach(m => tMonths[m] = 0);
 
             rawData.forEach(r => {
-                const tutors = getVal(r, ['導師']).split('/').map(s=>s.trim());
+                const tutors = getHColValue(r).split('/').map(s=>s.trim());
                 if (tutors.includes(name)) {
-                    const d = parseDate(getVal(r, ['日期']));
+                    const dateVal = r['日期'] || Object.values(r)[0];
+                    const d = parseDate(dateVal);
                     if (d) {
                         tTotal++;
                         if (d < refDate) tDone++;
                         const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                         if (tMonths[mKey] !== undefined) tMonths[mKey]++;
-                        const c = getVal(r, ['課程']) || "其他";
+                        const c = r['課程'] || Object.values(r)[1] || "其他";
                         tCourses[c] = (tCourses[c] || 0) + 1;
                     }
                 }
@@ -211,7 +210,7 @@
             document.getElementById('tutorRemaining').innerText = tTotal - tDone;
 
             renderPie('tutorPieChart', tCourses);
-            renderLine('tutorLineChart', tMonths, "個人課堂趨勢", "#6366f1");
+            renderLine('tutorLineChart', tMonths, "個人趨勢", "#6366f1");
         }
 
         function renderPie(id, dataObj) {
@@ -220,9 +219,9 @@
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(dataObj),
-                    datasets: [{ data: Object.values(dataObj), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'] }]
+                    datasets: [{ data: Object.values(dataObj), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'] }]
                 },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
             });
         }
 
@@ -237,9 +236,7 @@
                         data: Object.values(dataObj),
                         borderColor: color,
                         backgroundColor: color + '22',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 4
+                        fill: true, tension: 0.4
                     }]
                 },
                 options: {
