@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>派克學年Dashboard - H欄精確版</title>
+    <title>派克學年Dashboard - G/H欄對齊版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
@@ -15,79 +15,84 @@
 <body class="p-4 md:p-6">
 
     <div id="loading" class="fixed inset-0 bg-white flex flex-col justify-center items-center z-50">
-        <div class="text-xl font-bold text-blue-600 animate-bounce">正在讀取 H 欄數據...</div>
+        <div class="text-xl font-bold text-blue-600 animate-pulse">正在對齊 G 欄導師與 H 欄課程...</div>
     </div>
 
     <div class="max-w-[1600px] mx-auto space-y-6">
         
-        <div class="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-600">
+        <div class="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-xl shadow-sm border-l-4 border-indigo-600">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800">派克學年 Dashboard (H欄基準)</h1>
-                <p class="text-sm text-gray-500">當前統計基準：Google Sheet 第 H 欄</p>
+                <h1 class="text-2xl font-bold text-gray-800">派克學年 Dashboard</h1>
+                <p class="text-sm text-gray-500">統計基準：G 欄 (導師) | H 欄 (課程種類)</p>
             </div>
             <div class="flex items-center space-x-3 mt-4 md:mt-0">
-                <label class="font-medium text-gray-600">基準日期：</label>
-                <input type="date" id="datePicker" class="border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                <label class="font-medium text-gray-600 italic">基準日期：</label>
+                <input type="date" id="datePicker" class="border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
         </div>
 
         <div class="card">
             <div class="flex justify-between mb-2">
-                <span class="text-sm font-semibold text-blue-700">學年總進度</span>
-                <span id="progressDetail" class="text-sm font-bold text-blue-700">0 / 0 課堂 (0%)</span>
+                <span class="text-sm font-semibold text-gray-700">學年總進度 (基於全表班數)</span>
+                <span id="progressDetail" class="text-sm font-bold text-indigo-700">0 / 0 課堂 (0%)</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-4 shadow-inner">
-                <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all duration-1000" style="width: 0%"></div>
+            <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div id="progressBar" class="bg-indigo-600 h-4 rounded-full transition-all duration-1000" style="width: 0%"></div>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="card">
-                <h2 class="text-lg font-bold mb-4 border-b pb-2 text-gray-700">導師累積班數排行</h2>
+                <h2 class="text-lg font-bold mb-4 border-b pb-2 text-gray-700">導師班數排行 (G欄)</h2>
                 <div class="overflow-y-auto max-h-[350px]">
                     <table class="w-full text-sm">
                         <tbody id="leaderboardBody" class="divide-y"></tbody>
                     </table>
                 </div>
             </div>
+
             <div class="card flex flex-col items-center">
-                <h2 class="text-lg font-bold mb-4 w-full border-b pb-2 text-gray-700">課程分佈</h2>
+                <h2 class="text-lg font-bold mb-4 w-full border-b pb-2 text-gray-700">課程種類分佈 (H欄)</h2>
                 <div class="w-full h-[300px]"><canvas id="generalChart"></canvas></div>
             </div>
+
             <div class="card flex flex-col">
                 <h2 class="text-lg font-bold mb-4 border-b pb-2 text-gray-700">學年月份流量趨勢</h2>
                 <div class="w-full h-[300px]"><canvas id="monthlyLineChart"></canvas></div>
             </div>
         </div>
 
-        <div class="card">
+        <div class="card border-t-4 border-indigo-400">
             <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-2">
-                <h2 class="text-xl font-bold text-gray-700">導師個人數據分析 (25/26 學年)</h2>
-                <select id="tutorSelect" class="mt-2 md:mt-0 border rounded-lg px-6 py-2 bg-blue-50 font-bold text-blue-800">
+                <h2 class="text-xl font-bold text-gray-700">導師個人詳細數據 (G欄基準)</h2>
+                <select id="tutorSelect" class="mt-2 md:mt-0 border-2 border-indigo-200 rounded-lg px-6 py-2 bg-white font-bold text-indigo-800 focus:ring-2 focus:ring-indigo-500 outline-none">
                     <option value="">-- 選擇導師 --</option>
                 </select>
             </div>
             
             <div id="tutorStatsContainer" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="space-y-4">
-                    <div class="p-4 bg-gray-50 rounded-lg">
-                        <div class="text-gray-500 text-sm">個人全年總班數</div>
-                        <div id="tutorTotal" class="text-3xl font-bold text-gray-800">0</div>
+                    <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                        <div class="text-indigo-600 text-sm font-semibold">個人總班數</div>
+                        <div id="tutorTotal" class="text-3xl font-bold text-indigo-900">0</div>
                     </div>
-                    <div class="p-4 bg-green-50 rounded-lg">
-                        <div class="text-green-600 text-sm">個人已完成</div>
+                    <div class="p-4 bg-green-50 rounded-xl border border-green-100">
+                        <div class="text-green-600 text-sm font-semibold">已完成 (基準日前)</div>
                         <div id="tutorCompleted" class="text-3xl font-bold text-green-700">0</div>
                     </div>
-                    <div class="p-4 bg-orange-50 rounded-lg">
-                        <div class="text-orange-600 text-sm">個人待進行</div>
-                        <div id="tutorRemaining" class="text-3xl font-bold text-orange-700">0</div>
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <div class="text-slate-500 text-sm font-semibold">剩餘待進行</div>
+                        <div id="tutorRemaining" class="text-3xl font-bold text-slate-700">0</div>
                     </div>
                 </div>
-                <div class="h-[300px]"><canvas id="tutorPieChart"></canvas></div>
+                <div class="h-[300px] flex flex-col items-center">
+                    <span class="text-xs text-gray-400 mb-2">個人課程佔比 (H欄)</span>
+                    <canvas id="tutorPieChart"></canvas>
+                </div>
                 <div class="h-[300px]"><canvas id="tutorLineChart"></canvas></div>
             </div>
-            <div id="tutorEmptyState" class="text-center text-gray-400 py-20 bg-gray-50 rounded-xl border-2 border-dashed">
-                請選擇導師以檢視詳細數據
+            <div id="tutorEmptyState" class="text-center text-gray-400 py-16 bg-gray-50 rounded-xl border-2 border-dashed">
+                請選擇導師以載入數據
             </div>
         </div>
     </div>
@@ -98,10 +103,14 @@
         let charts = {};
         const ACADEMIC_MONTHS = ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"];
 
-        // 強制讀取特定位置或標籤
-        function getHColValue(row) {
-            // 優先找標籤「導師」，若無則找第 8 個欄位 (索引 7)
-            return row['導師'] || Object.values(row)[7] || "";
+        // 讀取 G 欄 (導師) - 索引 6
+        function getGCol(row) {
+            return row['導師'] || Object.values(row)[6] || "";
+        }
+
+        // 讀取 H 欄 (課程種類) - 索引 7
+        function getHCol(row) {
+            return row['課程'] || Object.values(row)[7] || "未分類";
         }
 
         function parseDate(str) {
@@ -129,7 +138,7 @@
             const s = document.getElementById('tutorSelect');
             const ts = new Set();
             rawData.forEach(r => {
-                const v = getHColValue(r);
+                const v = getGCol(r);
                 if (v) v.split('/').forEach(name => ts.add(name.trim()));
             });
             Array.from(ts).sort().forEach(n => s.add(new Option(n, n)));
@@ -144,7 +153,7 @@
             ACADEMIC_MONTHS.forEach(m => monthCounts[m] = 0);
 
             rawData.forEach(r => {
-                const dateVal = r['日期'] || Object.values(r)[0]; // 假設日期在第一欄
+                const dateVal = r['日期'] || Object.values(r)[0];
                 const d = parseDate(dateVal);
                 if (d) {
                     total++;
@@ -153,28 +162,28 @@
                     const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                     if (monthCounts[mKey] !== undefined) monthCounts[mKey]++;
 
-                    // 關鍵：使用 H 欄數據統計導師
-                    const tVal = getHColValue(r);
+                    // 統計 G 欄導師
+                    const tVal = getGCol(r);
                     if (tVal) tVal.split('/').forEach(n => {
                         n = n.trim();
                         if(n) tutorRank[n] = (tutorRank[n] || 0) + 1;
                     });
                     
-                    const cVal = r['課程'] || Object.values(r)[1] || "未分類";
-                    courseDist[cVal] = (courseDist[cVal] || 0) + 1;
+                    // 統計 H 欄課程
+                    const hVal = getHCol(r);
+                    courseDist[hVal] = (courseDist[hVal] || 0) + 1;
                 }
             });
 
-            // 更新 Progress Bar 文字 (顯示數量與百分比)
             const p = total ? Math.round((done/total)*100) : 0;
             document.getElementById('progressBar').style.width = p + '%';
             document.getElementById('progressDetail').innerText = `${done} / ${total} 課堂 (${p}%)`;
             
             const sorted = Object.entries(tutorRank).sort((a,b)=>b[1]-a[1]);
-            document.getElementById('leaderboardBody').innerHTML = sorted.map(([n,c]) => `<tr><td class="py-2">${n}</td><td class="text-right font-bold text-blue-600">${c} 班</td></tr>`).join('');
+            document.getElementById('leaderboardBody').innerHTML = sorted.map(([n,c]) => `<tr><td class="py-2 text-gray-600 font-medium">${n}</td><td class="text-right font-bold text-indigo-600">${c} 班</td></tr>`).join('');
 
             renderPie('generalChart', courseDist);
-            renderLine('monthlyLineChart', monthCounts, "全校趨勢", "#3b82f6");
+            renderLine('monthlyLineChart', monthCounts, "全校趨勢", "#4f46e5");
             updateIndividual(refDate);
         }
 
@@ -190,17 +199,16 @@
             ACADEMIC_MONTHS.forEach(m => tMonths[m] = 0);
 
             rawData.forEach(r => {
-                const tutors = getHColValue(r).split('/').map(s=>s.trim());
+                const tutors = getGCol(r).split('/').map(s=>s.trim());
                 if (tutors.includes(name)) {
-                    const dateVal = r['日期'] || Object.values(r)[0];
-                    const d = parseDate(dateVal);
+                    const d = parseDate(r['日期'] || Object.values(r)[0]);
                     if (d) {
                         tTotal++;
                         if (d < refDate) tDone++;
                         const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                         if (tMonths[mKey] !== undefined) tMonths[mKey]++;
-                        const c = r['課程'] || Object.values(r)[1] || "其他";
-                        tCourses[c] = (tCourses[c] || 0) + 1;
+                        const hVal = getHCol(r);
+                        tCourses[hVal] = (tCourses[hVal] || 0) + 1;
                     }
                 }
             });
@@ -219,9 +227,9 @@
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(dataObj),
-                    datasets: [{ data: Object.values(dataObj), backgroundColor: ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'] }]
+                    datasets: [{ data: Object.values(dataObj), backgroundColor: ['#4f46e5','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'] }]
                 },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } }
             });
         }
 
@@ -235,14 +243,14 @@
                         label: label,
                         data: Object.values(dataObj),
                         borderColor: color,
-                        backgroundColor: color + '22',
-                        fill: true, tension: 0.4
+                        backgroundColor: color + '15',
+                        fill: true, tension: 0.4, pointRadius: 3
                     }]
                 },
                 options: {
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
                 }
             });
         }
