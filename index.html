@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>派克學年Dashboard - 數據詳表版</title>
+    <title>派克學年數據中心 - 穩定修復版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
@@ -11,35 +11,31 @@
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f1f5f9; }
         .card { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 1.5rem; }
         .data-table-mini { width: 100%; font-size: 0.85rem; }
-        .data-table-mini tr:nth-child(even) { background-color: #f8fafc; }
         .data-table-mini td { padding: 8px 4px; border-bottom: 1px solid #f1f5f9; }
         .dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
-    <div id="loading" class="fixed inset-0 bg-white flex flex-col justify-center items-center z-50">
-        <div class="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div class="text-xl font-bold text-gray-700">正在整理課程詳表...</div>
+    <div id="statusOverlay" class="fixed inset-0 bg-white flex flex-col justify-center items-center z-50">
+        <div id="loader" class="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div id="statusMsg" class="text-xl font-bold text-gray-700">正在嘗試重新連線數據源...</div>
+        <button id="retryBtn" onclick="location.reload()" class="hidden mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg">手動刷新</button>
     </div>
 
     <div class="max-w-[1400px] mx-auto space-y-6">
-        
-        <div class="flex flex-col md:flex-row justify-between items-center bg-slate-900 text-white p-6 rounded-2xl shadow-xl">
+        <div class="flex flex-col md:flex-row justify-between items-center bg-slate-900 text-white p-6 rounded-2xl">
             <div>
                 <h1 class="text-2xl font-bold">派克學年數據中心</h1>
-                <p class="opacity-80 text-sm">數據基準：B 欄 (課程種類) | G 欄 (導師)</p>
+                <p id="dataInfo" class="opacity-70 text-sm italic text-yellow-400">正在自動偵測欄位結構...</p>
             </div>
-            <div class="mt-4 md:mt-0 flex items-center gap-3">
-                <span class="text-sm">基準日：</span>
-                <input type="date" id="datePicker" class="bg-white text-gray-800 rounded px-3 py-2 outline-none font-bold">
-            </div>
+            <input type="date" id="datePicker" class="mt-4 md:mt-0 bg-white text-gray-800 rounded px-3 py-2 font-bold">
         </div>
 
         <div class="card border-l-8 border-indigo-500">
             <div class="flex justify-between items-end mb-3">
-                <span class="text-gray-500 text-sm font-bold uppercase">學年進度 (Academic Year Progress)</span>
-                <span id="progressDetail" class="text-2xl font-black text-indigo-900">0 / 0</span>
+                <span class="text-gray-500 text-sm font-bold uppercase">Academic Progress</span>
+                <span id="progressDetail" class="text-2xl font-black text-indigo-900">載入中...</span>
             </div>
             <div class="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
                 <div id="progressBar" class="bg-indigo-600 h-full transition-all duration-1000" style="width: 0%"></div>
@@ -48,107 +44,116 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="card">
-                <h2 class="text-lg font-bold mb-4 text-gray-700 border-b pb-2 flex justify-between">
-                    <span>導師排行 (G)</span>
-                    <span class="text-xs text-gray-400 font-normal">總班數</span>
-                </h2>
-                <div class="overflow-y-auto max-h-[450px]">
-                    <table class="w-full text-sm">
-                        <tbody id="leaderboardBody" class="divide-y divide-gray-100"></tbody>
-                    </table>
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">導師排行 (自動識別)</h2>
+                <div class="overflow-y-auto max-h-[400px]">
+                    <table class="w-full text-sm"><tbody id="leaderboardBody"></tbody></table>
                 </div>
             </div>
 
             <div class="card">
-                <h2 class="text-lg font-bold mb-4 text-gray-700 border-b pb-2">課程種類分佈 (B)</h2>
-                <div class="h-[200px] mb-6"><canvas id="generalChart"></canvas></div>
-                <div class="mt-4 border-t pt-4">
-                    <table class="data-table-mini">
-                        <thead class="text-gray-400 text-xs text-left">
-                            <tr><th>課程種類</th><th class="text-right">堂數</th><th class="text-right">百分比</th></tr>
-                        </thead>
-                        <tbody id="generalStatsTable"></tbody>
-                    </table>
-                </div>
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">課程分佈 (自動識別)</h2>
+                <div class="h-[200px] mb-4"><canvas id="generalChart"></canvas></div>
+                <table class="data-table-mini"><tbody id="generalStatsTable"></tbody></table>
             </div>
 
             <div class="card">
-                <h2 class="text-lg font-bold mb-4 text-gray-700 border-b pb-2">月份流量趨勢</h2>
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">月份趨勢</h2>
                 <div class="h-[250px]"><canvas id="monthlyLineChart"></canvas></div>
             </div>
         </div>
 
-        <div class="card bg-slate-50 border border-slate-200">
+        <div class="card bg-slate-50">
             <div class="flex flex-col md:flex-row justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-slate-800">導師深度分析專區</h2>
-                <select id="tutorSelect" class="mt-4 md:mt-0 p-3 bg-white border-2 border-indigo-100 rounded-xl font-bold text-indigo-700 shadow-sm focus:ring-2 focus:ring-indigo-300 outline-none">
-                    <option value="">-- 請選擇導師 --</option>
-                </select>
+                <h2 class="text-xl font-bold">導師深度分析</h2>
+                <select id="tutorSelect" class="p-2 border rounded-lg font-bold"><option value="">-- 請選擇導師 --</option></select>
             </div>
-            
             <div id="tutorStatsContainer" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="card text-center flex flex-col justify-center">
-                    <div class="text-xs text-gray-400 font-bold uppercase">個人總班數</div>
-                    <div id="tutorTotal" class="text-5xl font-black text-slate-800 my-2">0</div>
+                <div class="card text-center">
+                    <div class="text-xs text-gray-400">個人總班數</div>
+                    <div id="tutorTotal" class="text-4xl font-black mt-2">0</div>
                 </div>
-                <div class="card text-center flex flex-col justify-center">
-                    <div class="text-xs text-green-500 font-bold uppercase">基準日前已完成</div>
-                    <div id="tutorCompleted" class="text-5xl font-black text-green-600 my-2">0</div>
+                <div class="card text-center">
+                    <div class="text-xs text-green-500 font-bold">已完成</div>
+                    <div id="tutorCompleted" class="text-4xl font-black text-green-600 mt-2">0</div>
                 </div>
                 <div class="card lg:col-span-1">
-                    <p class="text-xs font-bold text-gray-400 mb-4 text-center">個人課程佔比 (B)</p>
-                    <div class="h-[150px] mb-4"><canvas id="tutorPieChart"></canvas></div>
-                    <table class="data-table-mini mt-2 border-t pt-2">
-                        <tbody id="tutorStatsTable"></tbody>
-                    </table>
+                    <div class="h-[120px] mb-2"><canvas id="tutorPieChart"></canvas></div>
+                    <table class="data-table-mini"><tbody id="tutorStatsTable"></tbody></table>
                 </div>
-                <div class="card lg:col-span-1 h-[250px]">
-                    <p class="text-xs font-bold text-gray-400 mb-2 text-center">個人月份趨勢</p>
-                    <canvas id="tutorLineChart"></canvas>
-                </div>
-            </div>
-            
-            <div id="tutorEmptyState" class="py-16 text-center text-gray-400 italic">
-                請選擇導師以查看該員 B 欄課程數據列表
+                <div class="card lg:col-span-1 h-[250px]"><canvas id="tutorLineChart"></canvas></div>
             </div>
         </div>
     </div>
 
     <script>
-        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv";
+        // 修正後的 CSV URL (確保無緩存)
+        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv&gid=0&cache=" + Date.now();
+        
         let rawData = [];
         let charts = {};
+        let colIndex = { date: 0, course: 1, tutor: 6 }; // 預設值
         const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'];
         const MONTHS = ["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"];
 
-        const getACol = (r) => Object.values(r)[0] || ""; // 日期
-        const getBCol = (r) => (Object.values(r)[1] || "未分類").trim(); // 課程種類
-        const getGCol = (r) => Object.values(r)[6] || ""; // 導師
+        function autoDetectColumns(firstRow) {
+            const keys = Object.keys(firstRow);
+            keys.forEach((key, idx) => {
+                const k = key.toLowerCase();
+                if (k.includes('日期') || k.includes('date')) colIndex.date = idx;
+                if (k.includes('課程') || k.includes('category') || k.includes('類')) colIndex.course = idx;
+                if (k.includes('導師') || k.includes('tutor') || k.includes('老師')) colIndex.tutor = idx;
+            });
+            document.getElementById('dataInfo').innerText = `連線成功！偵測到：第${colIndex.date+1}欄日期, 第${colIndex.course+1}欄課程, 第${colIndex.tutor+1}欄導師`;
+        }
+
+        const getVal = (row, idx) => {
+            const arr = Object.values(row);
+            return (arr[idx] || "").toString().trim();
+        };
 
         function parseDate(str) {
             if (!str) return null;
             const match = str.match(/(\d+)年(\d+)月(\d+)日/);
             if (match) return new Date(match[1], match[2]-1, match[3]);
-            return isNaN(new Date(str).getTime()) ? null : new Date(str);
+            const d = new Date(str);
+            return isNaN(d.getTime()) ? null : d;
         }
 
         async function init() {
             document.getElementById('datePicker').value = new Date().toISOString().split('T')[0];
+            
             Papa.parse(SHEET_URL, {
-                download: true, header: true, skipEmptyLines: true,
+                download: true, header: true, skipEmptyLines: 'greedy',
                 complete: (results) => {
-                    rawData = results.data;
-                    document.getElementById('loading').style.display = 'none';
-                    const s = document.getElementById('tutorSelect');
-                    const ts = new Set();
-                    rawData.forEach(r => {
-                        const g = getGCol(r);
-                        if (g) g.split('/').forEach(n => ts.add(n.trim()));
-                    });
-                    Array.from(ts).sort().forEach(n => s.add(new Option(n, n)));
-                    updateAll();
-                }
+                    if (results.data && results.data.length > 0) {
+                        rawData = results.data;
+                        autoDetectColumns(rawData[0]);
+                        document.getElementById('statusOverlay').style.display = 'none';
+                        setupTutorSelect();
+                        updateAll();
+                    } else {
+                        showError("試算表內沒有數據，請檢查發布設定。");
+                    }
+                },
+                error: (err) => showError("無法獲取 Google Sheet，請確認連結是否發布為 CSV。")
             });
+        }
+
+        function showError(msg) {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('statusMsg').innerText = "錯誤: " + msg;
+            document.getElementById('statusMsg').className = "text-red-500 font-bold";
+            document.getElementById('retryBtn').classList.remove('hidden');
+        }
+
+        function setupTutorSelect() {
+            const s = document.getElementById('tutorSelect');
+            const ts = new Set();
+            rawData.forEach(r => {
+                const g = getVal(r, colIndex.tutor);
+                if (g) g.split('/').forEach(n => ts.add(n.trim()));
+            });
+            Array.from(ts).sort().forEach(n => { if(n) s.add(new Option(n, n)); });
         }
 
         function updateAll() {
@@ -158,31 +163,30 @@
             MONTHS.forEach(m => monthCounts[m] = 0);
 
             rawData.forEach(r => {
-                const d = parseDate(getACol(r));
+                const d = parseDate(getVal(r, colIndex.date));
                 if (d) {
                     total++;
                     if (d < refDate) done++;
                     const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                     if (monthCounts[mKey] !== undefined) monthCounts[mKey]++;
 
-                    const b = getBCol(r);
+                    const b = getVal(r, colIndex.course) || "未分類";
                     courseDist[b] = (courseDist[b] || 0) + 1;
 
-                    const g = getGCol(r);
+                    const g = getVal(r, colIndex.tutor);
                     if (g) g.split('/').forEach(n => {
                         n = n.trim(); if(n) tutorRank[n] = (tutorRank[n] || 0) + 1;
                     });
                 }
             });
 
-            // UI 更新
             const p = total ? Math.round((done/total)*100) : 0;
             document.getElementById('progressBar').style.width = p + '%';
-            document.getElementById('progressDetail').innerText = `${done} / ${total} 課堂 (${p}%)`;
+            document.getElementById('progressDetail').innerText = `${done} / ${total} (${p}%)`;
             
             const sortedTutors = Object.entries(tutorRank).sort((a,b)=>b[1]-a[1]);
             document.getElementById('leaderboardBody').innerHTML = sortedTutors.map(([n,c]) => `
-                <tr class="hover:bg-slate-50"><td class="py-3 text-gray-700 font-medium">${n}</td><td class="text-right font-black text-indigo-600">${c}</td></tr>
+                <tr class="hover:bg-slate-50"><td class="py-2 font-medium">${n}</td><td class="text-right font-bold text-indigo-600">${c}</td></tr>
             `).join('');
 
             renderPieWithTable('generalChart', 'generalStatsTable', courseDist, total);
@@ -193,23 +197,22 @@
         function updateIndividual(refDate) {
             const name = document.getElementById('tutorSelect').value;
             const container = document.getElementById('tutorStatsContainer');
-            const empty = document.getElementById('tutorEmptyState');
-            if (!name) { container.classList.add('hidden'); empty.classList.remove('hidden'); return; }
-            container.classList.remove('hidden'); empty.classList.add('hidden');
+            if (!name) { container.classList.add('hidden'); return; }
+            container.classList.remove('hidden');
 
             let tTotal = 0, tDone = 0;
             const tCourses = {}, tMonths = {};
             MONTHS.forEach(m => tMonths[m] = 0);
 
             rawData.forEach(r => {
-                if (getGCol(r).includes(name)) {
-                    const d = parseDate(getACol(r));
+                if (getVal(r, colIndex.tutor).includes(name)) {
+                    const d = parseDate(getVal(r, colIndex.date));
                     if (d) {
                         tTotal++;
                         if (d < refDate) tDone++;
                         const mKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                         if (tMonths[mKey] !== undefined) tMonths[mKey]++;
-                        const b = getBCol(r);
+                        const b = getVal(r, colIndex.course) || "未分類";
                         tCourses[b] = (tCourses[b] || 0) + 1;
                     }
                 }
@@ -224,50 +227,28 @@
         function renderPieWithTable(canvasId, tableId, dataObj, totalSum) {
             const labels = Object.keys(dataObj);
             const values = Object.values(dataObj);
-            
             if (charts[canvasId]) charts[canvasId].destroy();
             charts[canvasId] = new Chart(document.getElementById(canvasId), {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{ data: values, backgroundColor: COLORS }]
-                },
-                options: { 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } },
-                    cutout: '65%'
-                }
+                type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: COLORS }] },
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70%' }
             });
 
-            // 生成列表
-            const sortedData = Object.entries(dataObj).sort((a,b) => b[1]-a[1]);
-            const tableBody = document.getElementById(tableId);
-            tableBody.innerHTML = sortedData.map(([label, val], index) => {
-                const percent = totalSum ? Math.round((val/totalSum)*100) : 0;
-                const color = COLORS[index % COLORS.length];
-                return `
-                    <tr>
-                        <td class="flex items-center"><span class="dot" style="background-color:${color}"></span>${label}</td>
-                        <td class="text-right font-bold text-gray-700">${val}</td>
-                        <td class="text-right text-indigo-500 font-medium">${percent}%</td>
-                    </tr>
-                `;
-            }).join('');
+            const sorted = Object.entries(dataObj).sort((a,b) => b[1]-a[1]);
+            document.getElementById(tableId).innerHTML = sorted.map(([l, v], i) => `
+                <tr>
+                    <td><span class="dot" style="background-color:${COLORS[i%COLORS.length]}"></span>${l}</td>
+                    <td class="text-right font-bold">${v}</td>
+                    <td class="text-right text-indigo-500">${totalSum?Math.round(v/totalSum*100):0}%</td>
+                </tr>
+            `).join('');
         }
 
         function renderLine(id, dataObj, label, color) {
             if (charts[id]) charts[id].destroy();
             charts[id] = new Chart(document.getElementById(id), {
                 type: 'line',
-                data: {
-                    labels: MONTHS.map(m => m.split('-')[1] + '月'),
-                    datasets: [{ data: Object.values(dataObj), borderColor: color, fill: false, tension: 0.4, pointRadius: 3 }]
-                },
-                options: { 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 5 } } }
-                }
+                data: { labels: MONTHS.map(m=>m.split('-')[1]+'月'), datasets: [{ data: Object.values(dataObj), borderColor: color, tension: 0.4 }] },
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
         }
 
