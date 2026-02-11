@@ -7,17 +7,16 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 
     <style>
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
         .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); height: 100%; }
-        .chart-container { position: relative; height: 250px; width: 100%; }
+        .chart-container { position: relative; height: 300px; width: 100%; }
         .scroll-list { max-height: 250px; overflow-y: auto; }
-        /* 自定義滾動條 */
         .scroll-list::-webkit-scrollbar { width: 6px; }
-        .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
         .scroll-list::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
     </style>
 </head>
@@ -25,7 +24,6 @@
 
     <header class="mb-8">
         <h1 class="text-3xl font-bold text-gray-800 mb-4">派克課堂Dashboard</h1>
-        
         <div class="bg-white p-4 rounded-lg shadow flex flex-wrap gap-4 items-center">
             <div>
                 <label class="block text-sm font-medium text-gray-700">基準日期</label>
@@ -55,30 +53,19 @@
                 <div class="scroll-list">
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
-                            <tr>
-                                <th class="py-2 px-2">排名</th>
-                                <th class="py-2 px-2">導師</th>
-                                <th class="py-2 px-2 text-right">堂數</th>
-                            </tr>
+                            <tr><th class="py-2 px-2">排名</th><th class="py-2 px-2">導師</th><th class="py-2 px-2 text-right">堂數</th></tr>
                         </thead>
-                        <tbody id="tutorRankList">
-                            </tbody>
+                        <tbody id="tutorRankList"></tbody>
                     </table>
                 </div>
             </div>
-
             <div class="card flex flex-col items-center">
                 <h3 class="text-lg font-semibold mb-3 text-gray-800 w-full">課程種類分佈</h3>
-                <div class="chart-container">
-                    <canvas id="courseTypeChart"></canvas>
-                </div>
+                <div class="chart-container"><canvas id="courseTypeChart"></canvas></div>
             </div>
-
             <div class="card">
-                <h3 class="text-lg font-semibold mb-3 text-gray-800">每月課堂趨勢 (25年9月 - 26年8月)</h3>
-                <div class="chart-container">
-                    <canvas id="monthlyTrendChart"></canvas>
-                </div>
+                <h3 class="text-lg font-semibold mb-3 text-gray-800">每月課堂趨勢</h3>
+                <div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div>
             </div>
         </div>
     </section>
@@ -90,498 +77,225 @@
                 <span class="text-base font-medium text-blue-700">已完成課堂 / 總課堂</span>
                 <span class="text-sm font-medium text-blue-700" id="progressText">0 / 0</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-6 dark:bg-gray-200">
-                <div id="progressBar" class="bg-blue-600 h-6 rounded-full text-xs font-medium text-blue-100 text-center p-1 leading-none" style="width: 0%"> 0%</div>
-            </div>
-            <p class="text-sm text-gray-500 mt-2 text-right" id="progressSubText">計算範圍：2025年9月1日 至 2026年8月31日</p>
+            <div class="w-full bg-gray-200 rounded-full h-6"><div id="progressBar" class="bg-blue-600 h-6 rounded-full text-xs font-medium text-blue-100 text-center p-1 leading-none" style="width: 0%">0%</div></div>
         </div>
     </section>
 
     <section class="mb-8">
         <div class="flex items-center gap-4 mb-4">
             <h2 class="text-xl font-bold text-gray-700 border-l-4 border-purple-500 pl-3">第三部分：導師個人數值表</h2>
-            <select id="individualTutorSelect" class="border-gray-300 rounded shadow-sm border p-1 text-sm">
-                <option value="">請選擇導師...</option>
-                </select>
+            <select id="individualTutorSelect" class="border-gray-300 rounded shadow-sm border p-1 text-sm"><option value="">載入中...</option></select>
         </div>
-        
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="card flex flex-col justify-center items-center text-center space-y-4">
-                <div>
-                    <div class="text-gray-500 text-sm">總課堂數量</div>
-                    <div class="text-3xl font-bold text-purple-600" id="indTotal">0</div>
-                </div>
+                <div><div class="text-gray-500 text-sm">總課堂</div><div class="text-3xl font-bold text-purple-600" id="indTotal">0</div></div>
                 <div class="grid grid-cols-2 gap-8 w-full">
-                    <div>
-                        <div class="text-gray-500 text-sm">已上課堂</div>
-                        <div class="text-xl font-bold text-green-600" id="indDone">0</div>
-                    </div>
-                    <div>
-                        <div class="text-gray-500 text-sm">未上課堂</div>
-                        <div class="text-xl font-bold text-red-500" id="indPending">0</div>
-                    </div>
+                    <div><div class="text-gray-500 text-sm">已上</div><div class="text-xl font-bold text-green-600" id="indDone">0</div></div>
+                    <div><div class="text-gray-500 text-sm">未上</div><div class="text-xl font-bold text-red-500" id="indPending">0</div></div>
                 </div>
             </div>
-
             <div class="card flex flex-col items-center">
                 <h3 class="text-lg font-semibold mb-3 text-gray-800 w-full">教授課程類型</h3>
-                <div class="chart-container">
-                    <canvas id="indTypeChart"></canvas>
-                </div>
+                <div class="chart-container"><canvas id="indTypeChart"></canvas></div>
             </div>
-
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-3 text-gray-800">個人每月課堂表</h3>
-                <div class="chart-container">
-                    <canvas id="indTrendChart"></canvas>
-                </div>
-            </div>
+            <div class="card"><h3 class="text-lg font-semibold mb-3 text-gray-800">個人每月趨勢</h3><div class="chart-container"><canvas id="indTrendChart"></canvas></div></div>
         </div>
     </section>
 
     <section class="mb-12">
         <h2 class="text-xl font-bold text-gray-700 mb-4 border-l-4 border-orange-500 pl-3">第四部分：其他資料</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
             <div class="card">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="text-lg font-semibold text-gray-800">種類/導師 排行</h3>
-                </div>
-                <select id="ratioTypeSelect" class="w-full mb-3 border p-1 rounded text-sm">
-                    <option value="">選擇課程種類...</option>
-                </select>
-                <div class="scroll-list">
-                    <table class="w-full text-sm text-left">
-                        <tbody id="typeTutorRankList">
-                            </tbody>
-                    </table>
-                </div>
+                <select id="ratioTypeSelect" class="w-full mb-3 border p-1 rounded text-sm"><option value="">選擇課程種類...</option></select>
+                <div class="scroll-list"><table class="w-full text-sm text-left"><tbody id="typeTutorRankList"></tbody></table></div>
             </div>
-
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-3 text-gray-800">學校排行榜 (總課堂數)</h3>
-                <div class="scroll-list">
-                    <table class="w-full text-sm text-left">
-                        <tbody id="schoolRankList">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-3 text-gray-800">全職 vs 兼職 課堂佔比</h3>
-                <div class="chart-container" style="height: 200px;">
-                    <canvas id="ftPtChart"></canvas>
-                </div>
-                <div class="mt-4 text-sm space-y-2">
-                    <div class="flex justify-between">
-                        <span class="font-bold text-blue-600">全職導師</span>
-                        <span id="ftStats">0堂 (0%)</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="font-bold text-teal-500">兼職導師</span>
-                        <span id="ptStats">0堂 (0%)</span>
-                    </div>
-                    <p class="text-xs text-gray-400 mt-2">*全職名單: Harry, Zoe, Ian, Chris, Cola</p>
-                </div>
-            </div>
+            <div class="card"><h3 class="text-lg font-semibold mb-3 text-gray-800">學校排行榜</h3><div class="scroll-list"><table class="w-full text-sm text-left"><tbody id="schoolRankList"></tbody></table></div></div>
+            <div class="card"><h3 class="text-lg font-semibold mb-3 text-gray-800">全職/兼職比</h3><div class="chart-container"><canvas id="ftPtChart"></canvas></div></div>
         </div>
     </section>
 
     <div id="loading" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded shadow-lg flex flex-col items-center">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
-            <p>正在載入 Google Sheet 資料...</p>
-        </div>
+        <div class="bg-white p-6 rounded shadow-lg flex flex-col items-center"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div><p>資料處理中...</p></div>
     </div>
 
     <script>
-        // --- 設定 ---
+        // 註冊插件
+        Chart.register(ChartDataLabels);
+
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv';
         const FULL_TIME_STAFF = ['Harry', 'Zoe', 'Ian', 'Chris', 'Cola'];
-        
-        // 全域變量存儲原始數據
-        let RAW_DATA = [];
-        let FILTERED_DATA = []; // 根據時間篩選後的數據 (用於第一部分)
-        let YEAR_DATA = []; // 全年數據 (2025/9 - 2026/8)
-        
-        // Chart 實例 (用於銷毀重繪)
-        let charts = {};
+        let RAW_DATA = [], FILTERED_DATA = [], YEAR_DATA = [], charts = {};
 
-        // 初始化日期選擇器為今日
         document.getElementById('baseDate').valueAsDate = new Date();
 
-        // 頁面加載
-        window.onload = function() {
+        window.onload = () => {
             fetchAndProcessData();
-            
-            // 監聽器
             document.getElementById('baseDate').addEventListener('change', updateDashboard);
             document.getElementById('timeRange').addEventListener('change', updateDashboard);
             document.getElementById('individualTutorSelect').addEventListener('change', updateIndividualStats);
             document.getElementById('ratioTypeSelect').addEventListener('change', updateTypeTutorRank);
         };
 
-        // 1. 抓取與清洗資料
+        // 圓形圖標籤共用設定
+        const pieOptions = {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                datalabels: {
+                    color: '#fff',
+                    font: { weight: 'bold', size: 11 },
+                    formatter: (value, ctx) => {
+                        let sum = 0;
+                        let dataArr = ctx.chart.data.datasets[0].data;
+                        dataArr.map(data => { sum += data; });
+                        let percentage = (value * 100 / sum).toFixed(1) + "%";
+                        return value + "\n(" + percentage + ")";
+                    },
+                    display: (ctx) => {
+                        return ctx.dataset.data[ctx.dataIndex] > 0; // 只顯示大於0的
+                    }
+                }
+            }
+        };
+
         function fetchAndProcessData() {
             document.getElementById('loading').style.display = 'flex';
-            
             Papa.parse(CSV_URL, {
-                download: true,
-                header: true, // 假設第一行是標題
-                complete: function(results) {
-                    processRawData(results.data);
-                    document.getElementById('loading').style.display = 'none';
-                },
-                error: function(err) {
-                    alert("載入資料失敗，請檢查網絡或CSV連結。");
+                download: true, header: true,
+                complete: (results) => {
+                    RAW_DATA = results.data.filter(row => row['學校'] && row['日期']).map(row => {
+                        const m = row['日期'].match(/(\d+)年(\d+)月(\d+)日/);
+                        const tutors = (row['導師'] || "").split('/').map(t => t.trim()).filter(t => t);
+                        return {
+                            school: row['學校'], type: row['課程種類'], date: m ? new Date(m[1], m[2]-1, m[3]) : null,
+                            tutors: tutors, isFullTime: tutors.some(t => FULL_TIME_STAFF.includes(t))
+                        };
+                    });
+                    populateDropdowns();
+                    updateDashboard();
                     document.getElementById('loading').style.display = 'none';
                 }
             });
         }
 
-        function processRawData(data) {
-            RAW_DATA = data.filter(row => row['學校'] && row['日期']).map(row => {
-                // 解析中文日期 "2026年2月2日"
-                let dateStr = row['日期'];
-                let dateObj = null;
-                const regex = /(\d+)年(\d+)月(\d+)日/;
-                const match = dateStr.match(regex);
-                if (match) {
-                    dateObj = new Date(match[1], match[2] - 1, match[3]);
-                }
-
-                // 處理導師 (分割)
-                let rawTutor = row['導師'] || "";
-                let tutors = rawTutor.split('/').map(t => t.trim()).filter(t => t);
-
-                return {
-                    school: row['學校'],
-                    type: row['課程種類'],
-                    lessonNo: row['第幾堂'],
-                    date: dateObj,
-                    weekday: row['星期'],
-                    time: row['上課時間'],
-                    tutors: tutors, // Array
-                    courseName: row['課程名稱'],
-                    isFullTime: tutors.some(t => FULL_TIME_STAFF.includes(t)) // 標記是否包含全職
-                };
-            });
-
-            // 初始化下拉選單
-            populateDropdowns();
-            // 首次渲染
-            updateDashboard();
-        }
-
-        // 填充下拉選單 (導師 & 課程種類)
         function populateDropdowns() {
-            const allTutors = new Set();
-            const allTypes = new Set();
-
-            RAW_DATA.forEach(d => {
-                d.tutors.forEach(t => allTutors.add(t));
-                if(d.type) allTypes.add(d.type);
-            });
-
-            // 填充導師選單
-            const tutorSelect = document.getElementById('individualTutorSelect');
-            tutorSelect.innerHTML = '<option value="">請選擇導師...</option>';
-            Array.from(allTutors).sort().forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t;
-                opt.innerText = t;
-                tutorSelect.appendChild(opt);
-            });
-
-            // 填充課程種類選單 (第四部分)
-            const typeSelect = document.getElementById('ratioTypeSelect');
-            typeSelect.innerHTML = '<option value="">選擇課程種類...</option>';
-            Array.from(allTypes).sort().forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t;
-                opt.innerText = t;
-                typeSelect.appendChild(opt);
-            });
+            const tutors = new Set(), types = new Set();
+            RAW_DATA.forEach(d => { d.tutors.forEach(t => tutors.add(t)); if(d.type) types.add(d.type); });
+            const tSel = document.getElementById('individualTutorSelect');
+            tSel.innerHTML = '<option value="">選擇導師...</option>';
+            Array.from(tutors).sort().forEach(t => tSel.add(new Option(t, t)));
+            const rSel = document.getElementById('ratioTypeSelect');
+            rSel.innerHTML = '<option value="">選擇課程種類...</option>';
+            Array.from(types).sort().forEach(t => rSel.add(new Option(t, t)));
         }
 
-        // 2. 更新 Dashboard 邏輯
         function updateDashboard() {
-            const baseDate = new Date(document.getElementById('baseDate').value);
-            baseDate.setHours(0,0,0,0);
-            const rangeVal = document.getElementById('timeRange').value;
-
-            // 定義 "全年" 範圍 (2025/9/1 - 2026/8/31)
-            const academicStart = new Date(2025, 8, 1); // 9月 (Index 8)
-            const academicEnd = new Date(2026, 7, 31); // 8月 (Index 7)
-
-            // 全年數據集 (用於進度條、月度圖)
+            const base = new Date(document.getElementById('baseDate').value);
+            const range = document.getElementById('timeRange').value;
+            const academicStart = new Date(2025, 8, 1), academicEnd = new Date(2026, 7, 31);
+            
             YEAR_DATA = RAW_DATA.filter(d => d.date >= academicStart && d.date <= academicEnd);
-
-            // 篩選數據集 (用於第一部分總匯)
-            if (rangeVal === 'all') {
-                FILTERED_DATA = YEAR_DATA;
-            } else {
-                const days = parseInt(rangeVal);
-                const endDate = new Date(baseDate);
-                endDate.setDate(baseDate.getDate() + days);
-                
-                FILTERED_DATA = RAW_DATA.filter(d => {
-                    return d.date >= baseDate && d.date <= endDate;
-                });
+            if(range === 'all') { FILTERED_DATA = YEAR_DATA; } 
+            else {
+                const end = new Date(base); end.setDate(base.getDate() + parseInt(range));
+                FILTERED_DATA = RAW_DATA.filter(d => d.date >= base && d.date <= end);
             }
 
-            // --- 渲染第一部分 ---
-            renderTutorLeaderboard(FILTERED_DATA);
-            renderTypeChart(FILTERED_DATA);
-            renderMonthlyChart(YEAR_DATA, 'monthlyTrendChart', '總課堂數量'); // 右邊卡片是25年9月-26年8月
-
-            // --- 渲染第二部分 (進度) ---
-            renderProgressBar(YEAR_DATA, baseDate); // 比較基準日
-
-            // --- 渲染第四部分 (其他) ---
+            renderTutorRank(FILTERED_DATA);
+            renderPie('courseTypeChart', FILTERED_DATA, 'type');
+            renderTrend('monthlyTrendChart', YEAR_DATA, '總課堂');
+            renderProgress(YEAR_DATA, base);
             renderSchoolRank();
-            renderFTPTRatio(YEAR_DATA);
-            
-            // 觸發一次導師個人更新 (如果已選)
+            renderFT PT(YEAR_DATA);
             updateIndividualStats();
             updateTypeTutorRank();
         }
 
-        // --- 第一部分 Render Functions ---
-
-        function renderTutorLeaderboard(data) {
+        function renderPie(id, data, key) {
             const counts = {};
-            data.forEach(d => {
-                d.tutors.forEach(t => {
-                    counts[t] = (counts[t] || 0) + 1;
-                });
-            });
-
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-            const tbody = document.getElementById('tutorRankList');
-            tbody.innerHTML = '';
-            
-            sorted.forEach((item, index) => {
-                const row = `<tr class="border-b">
-                    <td class="py-2 px-2 font-medium text-gray-900">${index + 1}</td>
-                    <td class="py-2 px-2">${item[0]}</td>
-                    <td class="py-2 px-2 text-right font-bold text-blue-600">${item[1]}</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
-        }
-
-        function renderTypeChart(data) {
-            const counts = {};
-            data.forEach(d => {
-                if(d.type) counts[d.type] = (counts[d.type] || 0) + 1;
-            });
-
-            const ctx = document.getElementById('courseTypeChart').getContext('2d');
-            if(charts['type']) charts['type'].destroy();
-
-            charts['type'] = new Chart(ctx, {
+            data.forEach(d => { if(d[key]) counts[d[key]] = (counts[d[key]] || 0) + 1; });
+            if(charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), {
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(counts),
-                    datasets: [{
-                        data: Object.values(counts),
-                        backgroundColor: [
-                            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'
-                        ]
-                    }]
+                    datasets: [{ data: Object.values(counts), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'] }]
                 },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+                options: pieOptions
             });
         }
 
-        function renderMonthlyChart(data, canvasId, label) {
-            // 初始化月份 buckets (2025-09 to 2026-08)
-            const months = [
-                '2025-09', '2025-10', '2025-11', '2025-12', 
-                '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'
-            ];
-            const displayLabels = ['9月','10月','11月','12月','1月','2月','3月','4月','5月','6月','7月','8月'];
+        function renderTutorRank(data) {
+            const counts = {};
+            data.forEach(d => d.tutors.forEach(t => counts[t] = (counts[t] || 0) + 1));
+            const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+            document.getElementById('tutorRankList').innerHTML = sorted.map((item, i) => 
+                `<tr class="border-b"><td class="py-2 px-2">${i+1}</td><td class="py-2 px-2">${item[0]}</td><td class="py-2 px-2 text-right font-bold text-blue-600">${item[1]}</td></tr>`).join('');
+        }
+
+        function renderTrend(id, data, label) {
+            const labels = ['9月','10月','11月','12月','1月','2月','3月','4月','5月','6月','7月','8月'];
             const counts = new Array(12).fill(0);
-
             data.forEach(d => {
-                if(!d.date) return;
-                const y = d.date.getFullYear();
-                const m = d.date.getMonth() + 1;
-                const key = `${y}-${m.toString().padStart(2, '0')}`;
-                
-                const idx = months.indexOf(key);
-                if(idx !== -1) counts[idx]++;
+                const m = d.date.getMonth();
+                const idx = (m >= 8) ? (m - 8) : (m + 4);
+                if(idx >= 0 && idx < 12) counts[idx]++;
             });
-
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            if(charts[canvasId]) charts[canvasId].destroy();
-
-            charts[canvasId] = new Chart(ctx, {
+            if(charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), {
                 type: 'line',
-                data: {
-                    labels: displayLabels,
-                    datasets: [{
-                        label: label,
-                        data: counts,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+                data: { labels, datasets: [{ label, data: counts, borderColor: '#3b82f6', fill: true, backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3 }] },
+                options: { maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
             });
         }
 
-        // --- 第二部分 Render Functions ---
-
-        function renderProgressBar(data, today) {
-            const total = data.length;
-            // 已上課堂：日期 < 今天 (或 <= 今天，視乎需求，這裡設為 < 今天已完結的課)
-            const completed = data.filter(d => d.date < today).length;
-            const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-            document.getElementById('progressText').innerText = `${completed} / ${total}`;
-            const bar = document.getElementById('progressBar');
-            bar.style.width = `${pct}%`;
-            bar.innerText = `${pct}%`;
+        function renderProgress(data, today) {
+            const total = data.length, done = data.filter(d => d.date < today).length;
+            const pct = total ? Math.round(done/total*100) : 0;
+            document.getElementById('progressText').innerText = `${done} / ${total}`;
+            document.getElementById('progressBar').style.width = pct+'%';
+            document.getElementById('progressBar').innerText = pct+'%';
         }
 
-        // --- 第三部分 (導師個人) ---
-        
         function updateIndividualStats() {
-            const tutor = document.getElementById('individualTutorSelect').value;
-            if(!tutor) return;
-
-            // 該導師的全年數據
-            const tutorData = YEAR_DATA.filter(d => d.tutors.includes(tutor));
+            const t = document.getElementById('individualTutorSelect').value;
+            if(!t) return;
+            const data = YEAR_DATA.filter(d => d.tutors.includes(t));
             const today = new Date(document.getElementById('baseDate').value);
-
-            // 1. 數值
-            const total = tutorData.length;
-            const done = tutorData.filter(d => d.date < today).length;
-            const pending = total - done;
-
-            document.getElementById('indTotal').innerText = total;
+            const done = data.filter(d => d.date < today).length;
+            document.getElementById('indTotal').innerText = data.length;
             document.getElementById('indDone').innerText = done;
-            document.getElementById('indPending').innerText = pending;
-
-            // 2. 圓餅圖 (類型)
-            const typeCounts = {};
-            tutorData.forEach(d => { if(d.type) typeCounts[d.type] = (typeCounts[d.type] || 0) + 1; });
-            
-            const ctxPie = document.getElementById('indTypeChart').getContext('2d');
-            if(charts['indPie']) charts['indPie'].destroy();
-            charts['indPie'] = new Chart(ctxPie, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(typeCounts),
-                    datasets: [{
-                        data: Object.values(typeCounts),
-                        backgroundColor: ['#8b5cf6', '#ec4899', '#6366f1', '#3b82f6', '#10b981']
-                    }]
-                },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-            });
-
-            // 3. 折線圖
-            renderMonthlyChart(tutorData, 'indTrendChart', `${tutor} 的課堂`);
+            document.getElementById('indPending').innerText = data.length - done;
+            renderPie('indTypeChart', data, 'type');
+            renderTrend('indTrendChart', data, t+'的課堂');
         }
-
-        // --- 第四部分 (其他) ---
 
         function updateTypeTutorRank() {
             const type = document.getElementById('ratioTypeSelect').value;
-            const tbody = document.getElementById('typeTutorRankList');
-            tbody.innerHTML = '';
-            
             if(!type) return;
-
-            // 篩選該類型的所有課程 (使用 Filtered Data 還是 全年數據? 
-            // 根據 "第四部分" 描述通常指整體統計，這裡使用 YEAR_DATA)
-            const typeData = YEAR_DATA.filter(d => d.type === type);
             const counts = {};
-            typeData.forEach(d => {
-                d.tutors.forEach(t => counts[t] = (counts[t] || 0) + 1);
-            });
-
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-            sorted.forEach((item, index) => {
-                const row = `<tr class="border-b">
-                    <td class="py-2 px-2 text-gray-600">${index + 1}</td>
-                    <td class="py-2 px-2">${item[0]}</td>
-                    <td class="py-2 px-2 text-right font-bold text-orange-500">${item[1]}</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
+            YEAR_DATA.filter(d => d.type === type).forEach(d => d.tutors.forEach(t => counts[t] = (counts[t] || 0) + 1));
+            const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+            document.getElementById('typeTutorRankList').innerHTML = sorted.map((item, i) => 
+                `<tr class="border-b"><td class="py-2 px-2 text-gray-400">${i+1}</td><td class="py-2 px-2">${item[0]}</td><td class="py-2 px-2 text-right font-bold text-orange-500">${item[1]}</td></tr>`).join('');
         }
 
         function renderSchoolRank() {
-            // 使用 YEAR_DATA 統計學校
             const counts = {};
-            YEAR_DATA.forEach(d => {
-                if(d.school) counts[d.school] = (counts[d.school] || 0) + 1;
-            });
-
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-            const tbody = document.getElementById('schoolRankList');
-            tbody.innerHTML = '';
-
-            sorted.forEach((item, index) => {
-                // 顯示前 10 名以免列表過長
-                if(index >= 10) return;
-                const row = `<tr class="border-b">
-                    <td class="py-2 px-2 text-gray-600">${index + 1}</td>
-                    <td class="py-2 px-2 truncate max-w-[150px]" title="${item[0]}">${item[0]}</td>
-                    <td class="py-2 px-2 text-right font-bold text-gray-700">${item[1]}</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
+            YEAR_DATA.forEach(d => counts[d.school] = (counts[d.school] || 0) + 1);
+            const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,10);
+            document.getElementById('schoolRankList').innerHTML = sorted.map((item, i) => 
+                `<tr class="border-b"><td class="py-2 px-2 text-gray-400">${i+1}</td><td class="py-2 px-2 truncate max-w-[120px]">${item[0]}</td><td class="py-2 px-2 text-right font-bold">${item[1]}</td></tr>`).join('');
         }
 
-        function renderFTPTRatio(data) {
-            // 邏輯：這裡計算的是"課堂數"。
-            // 一節課如果由 Harry(全職) 教，就是全職課。
-            // 如果是 Harry/Zoe (兩全職)，算一堂全職？還是兩次人次？
-            // 需求："全職導師/所有課堂的堂數"。
-            // 這裡採用 "人次 (Man-lessons)" 計算比較準確。
-            // 例如一堂課由 Harry/PartTimeJohn 教。這堂課全職貢獻1，兼職貢獻1。總人次2。
-            
-            let ftCount = 0;
-            let ptCount = 0;
-
-            data.forEach(d => {
-                d.tutors.forEach(t => {
-                    if (FULL_TIME_STAFF.includes(t)) {
-                        ftCount++;
-                    } else {
-                        ptCount++;
-                    }
-                });
-            });
-
-            const total = ftCount + ptCount;
-            const ftPct = total === 0 ? 0 : ((ftCount / total) * 100).toFixed(1);
-            const ptPct = total === 0 ? 0 : ((ptCount / total) * 100).toFixed(1);
-
-            document.getElementById('ftStats').innerText = `${ftCount}堂 (${ftPct}%)`;
-            document.getElementById('ptStats').innerText = `${ptCount}堂 (${ptPct}%)`;
-
-            const ctx = document.getElementById('ftPtChart').getContext('2d');
+        function renderFTPT(data) {
+            let ft = 0, pt = 0;
+            data.forEach(d => d.tutors.forEach(t => FULL_TIME_STAFF.includes(t) ? ft++ : pt++));
             if(charts['ftpt']) charts['ftpt'].destroy();
-
-            charts['ftpt'] = new Chart(ctx, {
+            charts['ftpt'] = new Chart(document.getElementById('ftPtChart'), {
                 type: 'pie',
-                data: {
-                    labels: ['全職導師', '兼職導師'],
-                    datasets: [{
-                        data: [ftCount, ptCount],
-                        backgroundColor: ['#2563eb', '#14b8a6']
-                    }]
-                },
-                options: { maintainAspectRatio: false }
+                data: { labels: ['全職', '兼職'], datasets: [{ data: [ft, pt], backgroundColor: ['#2563eb', '#14b8a6'] }] },
+                options: pieOptions
             });
         }
     </script>
