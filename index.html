@@ -16,7 +16,6 @@
         .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); height: 100%; display: flex; flex-direction: column; }
         .chart-container { position: relative; flex-grow: 1; min-height: 250px; width: 100%; }
         .scroll-list { max-height: 250px; overflow-y: auto; flex-grow: 1; }
-        /* 自定義滾動條 */
         .scroll-list::-webkit-scrollbar { width: 6px; }
         .scroll-list::-webkit-scrollbar-track { background: #f1f1f1; }
         .scroll-list::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
@@ -72,6 +71,7 @@
                 <div class="chart-container">
                     <canvas id="courseTypeChart"></canvas>
                 </div>
+                <p class="text-xs text-gray-400 text-center mt-2">*佔比小於5%的類別隱藏數值，請將滑鼠移至圖表查看</p>
             </div>
 
             <div class="card">
@@ -90,7 +90,7 @@
                 <span class="text-base font-medium text-blue-700">已完成課堂 / 總課堂</span>
                 <span class="text-sm font-medium text-blue-700" id="progressText">0 / 0</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-6 dark:bg-gray-200">
+            <div class="w-full bg-gray-200 rounded-full h-6">
                 <div id="progressBar" class="bg-blue-600 h-6 rounded-full text-xs font-medium text-blue-100 text-center p-1 leading-none" style="width: 0%"> 0%</div>
             </div>
             <p class="text-sm text-gray-500 mt-2 text-right" id="progressSubText">計算範圍：2025年9月1日 至 2026年8月31日</p>
@@ -142,7 +142,6 @@
     <section class="mb-12">
         <h2 class="text-xl font-bold text-gray-700 mb-4 border-l-4 border-orange-500 pl-3">第四部分：其他資料</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
             <div class="card">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="text-lg font-semibold text-gray-800">種類/導師 排行</h3>
@@ -200,18 +199,21 @@
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFFF43IJhu4qgR8KiR_Oo9lwv7LkuTcjHzebpTvUd-SnnivG_5GwDT3-JzEncLTxKXbZuQ8LnU90n3/pub?output=csv';
         const FULL_TIME_STAFF = ['Harry', 'Zoe', 'Ian', 'Chris', 'Cola'];
         
-        let RAW_DATA = [];
-        let FILTERED_DATA = [];
-        let YEAR_DATA = [];
-        let charts = {};
+        let RAW_DATA = [], FILTERED_DATA = [], YEAR_DATA = [], charts = {};
 
-        // 設定圓形圖的共用 Options (包含顯示百分比)
+        // *** 修改重點：圓形圖共用設定 ***
         const commonPieOptions = {
             maintainAspectRatio: false,
+            layout: {
+                padding: 10 // 增加一點內距，避免邊緣文字被切掉
+            },
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: { boxWidth: 12, padding: 10 }
+                    labels: { boxWidth: 12, padding: 10, font: { size: 11 } }
+                },
+                tooltip: {
+                    enabled: true // 確保滑鼠移上去時仍然看得到數據
                 },
                 datalabels: {
                     color: '#fff',
@@ -219,29 +221,33 @@
                         weight: 'bold',
                         size: 11
                     },
+                    // 設定位置：推向扇形的邊緣
+                    anchor: 'end',
+                    align: 'start',
+                    offset: 0, 
+                    
+                    // 格式化與隱藏邏輯
                     formatter: (value, ctx) => {
                         let sum = 0;
                         let dataArr = ctx.chart.data.datasets[0].data;
-                        dataArr.map(data => {
-                            sum += data;
-                        });
-                        let percentage = (value * 100 / sum).toFixed(1) + "%";
-                        // 如果數值為0不顯示，避免擁擠
-                        if (value === 0) return "";
-                        return value + "\n(" + percentage + ")";
+                        dataArr.map(data => { sum += data; });
+                        let percentage = (value * 100 / sum);
+                        
+                        // *** 這裡修改：如果佔比小於 5%，則回傳 null (不顯示文字) ***
+                        // 避免文字重疊
+                        if (percentage < 5) return null;
+
+                        return value + "\n(" + percentage.toFixed(1) + "%)";
                     },
                     textAlign: 'center'
                 }
             }
         };
 
-        // 線形圖不顯示 DataLabels
         const commonLineOptions = {
             maintainAspectRatio: false,
             scales: { y: { beginAtZero: true } },
-            plugins: {
-                datalabels: { display: false } // 關閉標籤
-            }
+            plugins: { datalabels: { display: false } }
         };
 
         document.getElementById('baseDate').valueAsDate = new Date();
@@ -257,132 +263,73 @@
         function fetchAndProcessData() {
             document.getElementById('loading').style.display = 'flex';
             Papa.parse(CSV_URL, {
-                download: true,
-                header: true,
-                complete: function(results) {
-                    processRawData(results.data);
-                    document.getElementById('loading').style.display = 'none';
-                },
-                error: function(err) {
-                    alert("載入資料失敗，請檢查網絡或CSV連結。");
-                    document.getElementById('loading').style.display = 'none';
-                }
+                download: true, header: true,
+                complete: function(results) { processRawData(results.data); document.getElementById('loading').style.display = 'none'; },
+                error: function(err) { alert("載入失敗"); document.getElementById('loading').style.display = 'none'; }
             });
         }
 
         function processRawData(data) {
             RAW_DATA = data.filter(row => row['學校'] && row['日期']).map(row => {
-                let dateStr = row['日期'];
-                let dateObj = null;
-                const regex = /(\d+)年(\d+)月(\d+)日/;
-                const match = dateStr.match(regex);
-                if (match) {
-                    dateObj = new Date(match[1], match[2] - 1, match[3]);
-                }
-
-                let rawTutor = row['導師'] || "";
-                let tutors = rawTutor.split('/').map(t => t.trim()).filter(t => t);
-
+                let m = row['日期'].match(/(\d+)年(\d+)月(\d+)日/);
+                let tutors = (row['導師'] || "").split('/').map(t => t.trim()).filter(t => t);
                 return {
-                    school: row['學校'],
-                    type: row['課程種類'],
-                    lessonNo: row['第幾堂'],
-                    date: dateObj,
-                    weekday: row['星期'],
-                    time: row['上課時間'],
-                    tutors: tutors,
-                    courseName: row['課程名稱'],
-                    isFullTime: tutors.some(t => FULL_TIME_STAFF.includes(t))
+                    school: row['學校'], type: row['課程種類'], 
+                    date: m ? new Date(m[1], m[2]-1, m[3]) : null,
+                    tutors: tutors, isFullTime: tutors.some(t => FULL_TIME_STAFF.includes(t))
                 };
             });
-
             populateDropdowns();
             updateDashboard();
         }
 
         function populateDropdowns() {
-            const allTutors = new Set();
-            const allTypes = new Set();
-            RAW_DATA.forEach(d => {
-                d.tutors.forEach(t => allTutors.add(t));
-                if(d.type) allTypes.add(d.type);
-            });
+            const allTutors = new Set(), allTypes = new Set();
+            RAW_DATA.forEach(d => { d.tutors.forEach(t => allTutors.add(t)); if(d.type) allTypes.add(d.type); });
+            
+            const tSel = document.getElementById('individualTutorSelect');
+            tSel.innerHTML = '<option value="">請選擇導師...</option>';
+            Array.from(allTutors).sort().forEach(t => tSel.add(new Option(t, t)));
 
-            const tutorSelect = document.getElementById('individualTutorSelect');
-            tutorSelect.innerHTML = '<option value="">請選擇導師...</option>';
-            Array.from(allTutors).sort().forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t;
-                opt.innerText = t;
-                tutorSelect.appendChild(opt);
-            });
-
-            const typeSelect = document.getElementById('ratioTypeSelect');
-            typeSelect.innerHTML = '<option value="">選擇課程種類...</option>';
-            Array.from(allTypes).sort().forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t;
-                opt.innerText = t;
-                typeSelect.appendChild(opt);
-            });
+            const tySel = document.getElementById('ratioTypeSelect');
+            tySel.innerHTML = '<option value="">選擇課程種類...</option>';
+            Array.from(allTypes).sort().forEach(t => tySel.add(new Option(t, t)));
         }
 
         function updateDashboard() {
-            const baseDate = new Date(document.getElementById('baseDate').value);
-            baseDate.setHours(0,0,0,0);
-            const rangeVal = document.getElementById('timeRange').value;
-
-            const academicStart = new Date(2025, 8, 1);
-            const academicEnd = new Date(2026, 7, 31);
-            YEAR_DATA = RAW_DATA.filter(d => d.date >= academicStart && d.date <= academicEnd);
-
-            if (rangeVal === 'all') {
-                FILTERED_DATA = YEAR_DATA;
-            } else {
-                const days = parseInt(rangeVal);
-                const endDate = new Date(baseDate);
-                endDate.setDate(baseDate.getDate() + days);
-                FILTERED_DATA = RAW_DATA.filter(d => d.date >= baseDate && d.date <= endDate);
+            const base = new Date(document.getElementById('baseDate').value); base.setHours(0,0,0,0);
+            const range = document.getElementById('timeRange').value;
+            const start = new Date(2025, 8, 1), end = new Date(2026, 7, 31);
+            YEAR_DATA = RAW_DATA.filter(d => d.date >= start && d.date <= end);
+            
+            if (range === 'all') FILTERED_DATA = YEAR_DATA;
+            else {
+                const rangeEnd = new Date(base); rangeEnd.setDate(base.getDate() + parseInt(range));
+                FILTERED_DATA = RAW_DATA.filter(d => d.date >= base && d.date <= rangeEnd);
             }
 
             renderTutorLeaderboard(FILTERED_DATA);
             renderTypeChart(FILTERED_DATA);
             renderMonthlyChart(YEAR_DATA, 'monthlyTrendChart', '總課堂數量');
-            renderProgressBar(YEAR_DATA, baseDate);
+            renderProgressBar(YEAR_DATA, base);
             renderSchoolRank();
             renderFTPTRatio(YEAR_DATA);
             updateIndividualStats();
             updateTypeTutorRank();
         }
 
-        // --- Render Functions ---
-
         function renderTutorLeaderboard(data) {
-            const counts = {};
-            data.forEach(d => {
-                d.tutors.forEach(t => counts[t] = (counts[t] || 0) + 1);
-            });
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-            const tbody = document.getElementById('tutorRankList');
-            tbody.innerHTML = '';
-            
-            sorted.forEach((item, index) => {
-                const row = `<tr class="border-b hover:bg-gray-50">
-                    <td class="py-2 px-2 font-medium text-gray-900">${index + 1}</td>
-                    <td class="py-2 px-2">${item[0]}</td>
-                    <td class="py-2 px-2 text-right font-bold text-blue-600">${item[1]}</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
+            const counts = {}; data.forEach(d => d.tutors.forEach(t => counts[t] = (counts[t] || 0) + 1));
+            const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+            document.getElementById('tutorRankList').innerHTML = sorted.map((item, i) => 
+                `<tr class="border-b hover:bg-gray-50"><td class="py-2 px-2 font-medium">${i+1}</td><td class="py-2 px-2">${item[0]}</td><td class="py-2 px-2 text-right font-bold text-blue-600">${item[1]}</td></tr>`
+            ).join('');
         }
 
         function renderTypeChart(data) {
-            const counts = {};
-            data.forEach(d => { if(d.type) counts[d.type] = (counts[d.type] || 0) + 1; });
-
+            const counts = {}; data.forEach(d => { if(d.type) counts[d.type] = (counts[d.type] || 0) + 1; });
             const ctx = document.getElementById('courseTypeChart').getContext('2d');
             if(charts['type']) charts['type'].destroy();
-
             charts['type'] = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -392,169 +339,88 @@
                         backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1']
                     }]
                 },
-                options: commonPieOptions // 使用包含百分比的設定
+                options: commonPieOptions
             });
         }
 
-        function renderMonthlyChart(data, canvasId, label) {
-            const months = ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'];
-            const displayLabels = ['9月','10月','11月','12月','1月','2月','3月','4月','5月','6月','7月','8月'];
+        function renderMonthlyChart(data, id, label) {
+            const months = ['9月','10月','11月','12月','1月','2月','3月','4月','5月','6月','7月','8月'];
             const counts = new Array(12).fill(0);
-
             data.forEach(d => {
                 if(!d.date) return;
-                const y = d.date.getFullYear();
-                const m = d.date.getMonth() + 1;
-                const key = `${y}-${m.toString().padStart(2, '0')}`;
-                const idx = months.indexOf(key);
-                if(idx !== -1) counts[idx]++;
+                let idx = d.date.getMonth();
+                idx = (idx >= 8) ? (idx - 8) : (idx + 4); 
+                if(idx >= 0 && idx < 12) counts[idx]++;
             });
-
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            if(charts[canvasId]) charts[canvasId].destroy();
-
-            charts[canvasId] = new Chart(ctx, {
+            const ctx = document.getElementById(id).getContext('2d');
+            if(charts[id]) charts[id].destroy();
+            charts[id] = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: displayLabels,
-                    datasets: [{
-                        label: label,
-                        data: counts,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
+                data: { labels: months, datasets: [{ label, data: counts, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 }] },
                 options: commonLineOptions
             });
         }
 
         function renderProgressBar(data, today) {
-            const total = data.length;
-            const completed = data.filter(d => d.date < today).length;
-            const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-            document.getElementById('progressText').innerText = `${completed} / ${total}`;
-            const bar = document.getElementById('progressBar');
-            bar.style.width = `${pct}%`;
-            bar.innerText = `${pct}%`;
+            const total = data.length, done = data.filter(d => d.date < today).length;
+            const pct = total ? Math.round(done/total*100) : 0;
+            document.getElementById('progressText').innerText = `${done} / ${total}`;
+            document.getElementById('progressBar').style.width = pct+'%';
+            document.getElementById('progressBar').innerText = pct+'%';
         }
 
         function updateIndividualStats() {
-            const tutor = document.getElementById('individualTutorSelect').value;
-            if(!tutor) return;
-
-            const tutorData = YEAR_DATA.filter(d => d.tutors.includes(tutor));
+            const t = document.getElementById('individualTutorSelect').value;
+            if(!t) return;
+            const d = YEAR_DATA.filter(row => row.tutors.includes(t));
             const today = new Date(document.getElementById('baseDate').value);
-
-            const total = tutorData.length;
-            const done = tutorData.filter(d => d.date < today).length;
-            const pending = total - done;
-
-            document.getElementById('indTotal').innerText = total;
-            document.getElementById('indDone').innerText = done;
-            document.getElementById('indPending').innerText = pending;
-
-            const typeCounts = {};
-            tutorData.forEach(d => { if(d.type) typeCounts[d.type] = (typeCounts[d.type] || 0) + 1; });
+            const done = d.filter(row => row.date < today).length;
             
-            const ctxPie = document.getElementById('indTypeChart').getContext('2d');
-            if(charts['indPie']) charts['indPie'].destroy();
-            charts['indPie'] = new Chart(ctxPie, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(typeCounts),
-                    datasets: [{
-                        data: Object.values(typeCounts),
-                        backgroundColor: ['#8b5cf6', '#ec4899', '#6366f1', '#3b82f6', '#10b981']
-                    }]
-                },
-                options: commonPieOptions // 使用包含百分比的設定
-            });
+            document.getElementById('indTotal').innerText = d.length;
+            document.getElementById('indDone').innerText = done;
+            document.getElementById('indPending').innerText = d.length - done;
 
-            renderMonthlyChart(tutorData, 'indTrendChart', `${tutor} 的課堂`);
+            const counts = {}; d.forEach(row => { if(row.type) counts[row.type] = (counts[row.type] || 0) + 1; });
+            const ctx = document.getElementById('indTypeChart').getContext('2d');
+            if(charts['indPie']) charts['indPie'].destroy();
+            charts['indPie'] = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#8b5cf6', '#ec4899', '#6366f1', '#3b82f6', '#10b981'] }] },
+                options: commonPieOptions
+            });
+            renderMonthlyChart(d, 'indTrendChart', t+' 的課堂');
         }
 
         function updateTypeTutorRank() {
-            const type = document.getElementById('ratioTypeSelect').value;
-            const tbody = document.getElementById('typeTutorRankList');
-            tbody.innerHTML = '';
-            
-            if(!type) return;
-
-            const typeData = YEAR_DATA.filter(d => d.type === type);
-            const counts = {};
-            typeData.forEach(d => {
-                d.tutors.forEach(t => counts[t] = (counts[t] || 0) + 1);
-            });
-
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-            sorted.forEach((item, index) => {
-                const row = `<tr class="border-b">
-                    <td class="py-2 px-2 text-gray-600">${index + 1}</td>
-                    <td class="py-2 px-2">${item[0]}</td>
-                    <td class="py-2 px-2 text-right font-bold text-orange-500">${item[1]}</td>
-                </tr>`;
-                tbody.innerHTML += row;
+            const t = document.getElementById('ratioTypeSelect').value;
+            const tbody = document.getElementById('typeTutorRankList'); tbody.innerHTML = '';
+            if(!t) return;
+            const counts = {}; YEAR_DATA.filter(d => d.type === t).forEach(d => d.tutors.forEach(subT => counts[subT] = (counts[subT]||0)+1));
+            Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach((item,i) => {
+                tbody.innerHTML += `<tr class="border-b"><td class="py-2 px-2 text-gray-600">${i+1}</td><td class="py-2 px-2">${item[0]}</td><td class="py-2 px-2 text-right font-bold text-orange-500">${item[1]}</td></tr>`;
             });
         }
 
         function renderSchoolRank() {
-            const counts = {};
-            YEAR_DATA.forEach(d => {
-                if(d.school) counts[d.school] = (counts[d.school] || 0) + 1;
-            });
-
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-            const tbody = document.getElementById('schoolRankList');
-            tbody.innerHTML = '';
-
-            sorted.forEach((item, index) => {
-                if(index >= 10) return;
-                const row = `<tr class="border-b">
-                    <td class="py-2 px-2 text-gray-600">${index + 1}</td>
-                    <td class="py-2 px-2 truncate max-w-[150px]" title="${item[0]}">${item[0]}</td>
-                    <td class="py-2 px-2 text-right font-bold text-gray-700">${item[1]}</td>
-                </tr>`;
-                tbody.innerHTML += row;
+            const counts = {}; YEAR_DATA.forEach(d => counts[d.school] = (counts[d.school]||0)+1);
+            const tbody = document.getElementById('schoolRankList'); tbody.innerHTML = '';
+            Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach((item,i) => {
+                tbody.innerHTML += `<tr class="border-b"><td class="py-2 px-2 text-gray-600">${i+1}</td><td class="py-2 px-2 truncate max-w-[150px]" title="${item[0]}">${item[0]}</td><td class="py-2 px-2 text-right font-bold text-gray-700">${item[1]}</td></tr>`;
             });
         }
 
         function renderFTPTRatio(data) {
-            let ftCount = 0;
-            let ptCount = 0;
-
-            data.forEach(d => {
-                d.tutors.forEach(t => {
-                    if (FULL_TIME_STAFF.includes(t)) {
-                        ftCount++;
-                    } else {
-                        ptCount++;
-                    }
-                });
-            });
-
-            const total = ftCount + ptCount;
-            const ftPct = total === 0 ? 0 : ((ftCount / total) * 100).toFixed(1);
-            const ptPct = total === 0 ? 0 : ((ptCount / total) * 100).toFixed(1);
-
-            document.getElementById('ftStats').innerText = `${ftCount}堂 (${ftPct}%)`;
-            document.getElementById('ptStats').innerText = `${ptCount}堂 (${ptPct}%)`;
-
+            let ft=0, pt=0; data.forEach(d => d.tutors.forEach(t => FULL_TIME_STAFF.includes(t) ? ft++ : pt++));
+            const total = ft+pt, ftPct = total?((ft/total)*100).toFixed(1):0, ptPct = total?((pt/total)*100).toFixed(1):0;
+            document.getElementById('ftStats').innerText = `${ft}堂 (${ftPct}%)`;
+            document.getElementById('ptStats').innerText = `${pt}堂 (${ptPct}%)`;
+            
             const ctx = document.getElementById('ftPtChart').getContext('2d');
             if(charts['ftpt']) charts['ftpt'].destroy();
-
             charts['ftpt'] = new Chart(ctx, {
                 type: 'pie',
-                data: {
-                    labels: ['全職導師', '兼職導師'],
-                    datasets: [{
-                        data: [ftCount, ptCount],
-                        backgroundColor: ['#2563eb', '#14b8a6']
-                    }]
-                },
-                options: commonPieOptions // 使用包含百分比的設定
+                data: { labels: ['全職', '兼職'], datasets: [{ data: [ft, pt], backgroundColor: ['#2563eb', '#14b8a6'] }] },
+                options: commonPieOptions
             });
         }
     </script>
